@@ -1,0 +1,85 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - appcode/**
+      - .github/workflows/build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: appcode
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      # Unsigned on purpose: LiveContainer signs the app itself when you install it.
+      - name: Build unsigned IPA
+        run: |
+          xcodebuild build \
+            -project Trace.xcodeproj \
+            -scheme Trace \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Trace.app Payload/
+          zip -qry Trace.ipa Payload
+
+      - name: Take simulator screenshot
+        run: |
+          xcodebuild build \
+            -project Trace.xcodeproj \
+            -scheme Trace \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim
+          UDID=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[] | .[] | select(.name | startswith("iPhone"))] | last | .udid')
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryLevel 100
+          xcrun simctl install "$UDID" build-sim/Build/Products/Debug-iphonesimulator/Trace.app
+          xcrun simctl launch "$UDID" com.xerooae.trace
+          sleep 8
+          mkdir -p screenshots
+          xcrun simctl io "$UDID" screenshot screenshots/home.png
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: appcode/screenshots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Trace-ipa
+          path: appcode/Trace.ipa
+
+      # Stable download link for the phone:
+      # https://github.com/<owner>/<repo>/releases/download/latest/Trace.ipa
+      - name: Publish IPA to the "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Trace.ipa \
+            --target "$GITHUB_SHA" \
+            --title "Latest build" \
+            --notes "Built from ${GITHUB_SHA::7}" \
+            --prerelease
