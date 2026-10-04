@@ -24,6 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The Icon Composer app icon (AppIcon.icon) needs Xcode 26 or newer.
+      - name: Select newest stable Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
       - name: Generate Xcode project
         run: |
           brew install xcodegen
@@ -33,52 +40,29 @@ jobs:
       - name: Build unsigned IPA
         run: |
           xcodebuild build \
-            -project Trace.xcodeproj \
-            -scheme Trace \
+            -project Locus.xcodeproj \
+            -scheme Locus \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
           mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/Trace.app Payload/
-          zip -qry Trace.ipa Payload
-
-      - name: Take simulator screenshot
-        run: |
-          xcodebuild build \
-            -project Trace.xcodeproj \
-            -scheme Trace \
-            -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build-sim
-          UDID=$(xcrun simctl list devices available -j \
-            | jq -r '[.devices[] | .[] | select(.name | startswith("iPhone"))] | last | .udid')
-          xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryLevel 100
-          xcrun simctl install "$UDID" build-sim/Build/Products/Debug-iphonesimulator/Trace.app
-          xcrun simctl launch "$UDID" com.xerooae.trace
-          sleep 8
-          mkdir -p screenshots
-          xcrun simctl io "$UDID" screenshot screenshots/home.png
+          cp -R build/Build/Products/Release-iphoneos/Locus.app Payload/
+          zip -qry Locus.ipa Payload
 
       - uses: actions/upload-artifact@v4
         with:
-          name: screenshots
-          path: appcode/screenshots
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Trace-ipa
-          path: appcode/Trace.ipa
+          name: Locus-ipa
+          path: appcode/Locus.ipa
 
       # Stable download link for the phone:
-      # https://github.com/<owner>/<repo>/releases/download/latest/Trace.ipa
+      # https://github.com/<owner>/<repo>/releases/download/latest/Locus.ipa
       - name: Publish IPA to the "latest" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest Trace.ipa \
+          gh release create latest Locus.ipa \
             --target "$GITHUB_SHA" \
             --title "Latest build" \
             --notes "Built from ${GITHUB_SHA::7}" \
