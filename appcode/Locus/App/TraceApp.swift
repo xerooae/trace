@@ -70,9 +70,28 @@ final class AppRouter: ObservableObject {
 struct AppTabs: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: SpoofSession
+    @State private var showSearch = false
+
+    /// The search control never becomes the selected tab, so the tab bar never
+    /// collapses into a search field (and never changes height). It opens a sheet.
+    private var selection: Binding<AppTab> {
+        Binding(
+            get: { router.tab },
+            set: { tab in
+                if tab == .search {
+                    showSearch = true
+                    // Re-publish the current tab so the tab bar snaps back to it.
+                    let current = router.tab
+                    router.tab = current
+                } else {
+                    router.tab = tab
+                }
+            }
+        )
+    }
 
     var body: some View {
-        TabView(selection: $router.tab) {
+        TabView(selection: selection) {
             Tab("Map", systemImage: "map", value: AppTab.map) {
                 MapHomeView()
             }
@@ -83,11 +102,16 @@ struct AppTabs: View {
                 SettingsView()
             }
             Tab(value: AppTab.search, role: .search) {
-                SearchView()
+                // Never shown: selecting search opens the sheet below instead.
+                Color.clear
             }
         }
         .tabViewStyle(.sidebarAdaptable)
         .tabBarMinimizeBehavior(.never)
+        .sheet(isPresented: $showSearch) {
+            SearchView()
+                .presentationDetents([.large])
+        }
         .sensoryFeedback(trigger: session.status) { old, new in
             if new == .active && old != .active { return .success }
             if new.isDropped && !old.isDropped { return .warning }

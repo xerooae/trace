@@ -1,13 +1,16 @@
 import MapKit
 import SwiftUI
 
-/// The search tab: a separate search control next to the tab bar. Results are a
-/// native list; choosing one places it on the map, ready for Move here.
+/// Search opens as a sheet from the search control beside the tab bar, with the
+/// keyboard up. Choosing a result closes the sheet and places it on the map,
+/// ready for Move here.
 struct SearchView: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var completer = PlaceSearchCompleter()
     @State private var query = ""
+    @State private var searchActive = true
 
     var body: some View {
         NavigationStack {
@@ -62,7 +65,8 @@ struct SearchView: View {
                 }
             }
             .navigationTitle("Search")
-            .searchable(text: $query, prompt: "Places or coordinates")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, isPresented: $searchActive, prompt: "Places or coordinates")
             .autocorrectionDisabled()
             .onSubmit(of: .search) {
                 if let coordinate = typedCoordinate { choose(coordinate, name: nil) }
@@ -147,6 +151,7 @@ struct SearchView: View {
         router.cameraTarget = SavedPlace(name: name ?? Coord.format(coordinate), coordinate: coordinate)
         router.tab = .map
         query = ""
+        dismiss()
     }
 }
 
