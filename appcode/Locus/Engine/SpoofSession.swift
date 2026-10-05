@@ -23,7 +23,7 @@ enum TravelMode: String, CaseIterable, Identifiable {
         case .walk: return "figure.walk"
         case .run: return "figure.run"
         case .cycle: return "bicycle"
-        case .drive: return "car.fill"
+        case .drive: return "car"
         }
     }
 
@@ -52,11 +52,12 @@ enum SpoofStatus: Equatable {
     case reconnecting
     case dropped(String)
 
+    /// The status word. State is always said in words, never by colour alone.
     var label: String {
         switch self {
-        case .idle: return "Not Spoofing"
-        case .connecting: return "Starting…"
-        case .active: return "Spoofing"
+        case .idle: return "Off"
+        case .connecting: return "Connecting…"
+        case .active: return "Live"
         case .reconnecting: return "Reconnecting…"
         case .dropped: return "Interrupted"
         }
@@ -71,16 +72,30 @@ enum SpoofStatus: Equatable {
 @MainActor
 final class SpoofSession: ObservableObject {
     @Published var status: SpoofStatus = .idle
+    /// The candidate position: placed on the map but not sent yet. Equals `simulated` while live.
     @Published var pin: CLLocationCoordinate2D?
+    @Published var pinName: String?
     @Published var simulated: CLLocationCoordinate2D?
+    /// Name of the live position, when it came from search or Places.
+    @Published var liveName: String?
+    /// Degrees from north, unwrapped so the marker always turns the short way round.
+    @Published private(set) var heading: Double = 0
+    /// Where the live position has been during this session, for the trail on the map.
+    @Published private(set) var trail: [CLLocationCoordinate2D] = []
+    @Published private(set) var followingRoute = false
+    /// The device's own position, captured while nothing is live.
+    @Published private(set) var realLocation: CLLocationCoordinate2D?
     @Published var travelMode: TravelMode = .walk
-    @Published var mapStyleIndex: Int = 0
+    @Published var mapStyleIndex: Int = UserDefaults.standard.integer(forKey: Prefs.mapStyle) {
+        didSet { UserDefaults.standard.set(mapStyleIndex, forKey: Prefs.mapStyle) }
+    }
     @Published var lastError: String?
     @Published var isBusy = false
     @Published var joystickActive = false
 
     @Published var favorites: [SavedPlace] = []
     @Published var recents: [SavedPlace] = []
+    @Published var savedRoutes: [SavedRoute] = []
 
     private var resendTimer: Timer?
     private var healthTimer: Timer?
@@ -92,10 +107,18 @@ final class SpoofSession: ObservableObject {
 
     private let favoritesKey = "locus.favorites"
     private let recentsKey = "locus.recents"
+    private let routesKey = "trace.routes"
 
     init() {
         favorites = SavedPlace.load(key: favoritesKey)
         recents = SavedPlace.load(key: recentsKey)
+        savedRoutes = SavedRoute.load(key: routesKey)
+        locationKeeper.setPrecise(true)
+        locationKeeper.onUpdate = { [weak self] coordinate in
+            Task { @MainActor in
+                self?.receiveDeviceLocation(coordinate)
+            }
+        }
     }
 
     var isSpoofing: Bool {
@@ -104,18 +127,41 @@ final class SpoofSession: ObservableObject {
         return false
     }
 
-    func teleport(to coordinate: CLLocationCoordinate2D, pairing: PairingStore) {
+    /// A placed position that isn't the live one yet.
+    var candidate: CLLocationCoordinate2D? {
+        guard let pin else { return nil }
+        return Coord.same(pin, simulated) ? nil : pin
+    }
+
+    func placeCandidate(_ coordinate: CLLocationCoordinate2D, name: String?) {
+        pin = coordinate
+        pinName = name
+    }
+
+    func clearCandidate() {
+        pin = simulated
+        pinName = nil
+    }
+
+    func teleport(to coordinate: CLLocationCoordinate2D, name: String? = nil, pairing: PairingStore) {
         guard pairing.hasPairingFile else {
-            lastError = "Import an RPPairing file in Settings first."
+            lastError = "Pair this iPhone in Settings first."
             return
         }
+        routeTask?.cancel()
+        routeTask = nil
+        followingRoute = false
+        let placeName = name ?? (Coord.same(coordinate, pin) ? pinName : nil)
         pin = coordinate
+        pinName = placeName
+        liveName = placeName
         apply(coordinate, pairing: pairing, markRecent: true)
     }
 
     func stop(pairing: PairingStore) {
         routeTask?.cancel()
         routeTask = nil
+        followingRoute = false
         stopJoystick()
         stopResend()
         stopHealth()
@@ -125,39 +171,46 @@ final class SpoofSession: ObservableObject {
         switch result {
         case .success:
             simulated = nil
+            liveName = nil
+            heading = 0
+            trail = []
             status = .idle
             endBackground()
-            // Keep location updates running so the map puck / locate button
-            // can return to the real GPS fix (not the leftover pin).
+            // Keep location updates running so the map can return to the real fix.
+            locationKeeper.setPrecise(true)
             locationKeeper.start()
         case .failure(let error):
             lastError = error.localizedDescription
             status = .dropped(error.localizedDescription)
-            postDropNotification(error.localizedDescription)
+            postDropNotification()
         }
     }
 
-    /// Best-known real device coordinate (not the teleport pin).
+    /// Best-known real device coordinate (not the set position).
     var realCoordinate: CLLocationCoordinate2D? {
-        locationKeeper.lastKnownCoordinate
+        realLocation ?? (simulated == nil ? locationKeeper.lastKnownCoordinate : nil)
     }
 
-    /// Start lightweight GPS updates for the map puck / locate button.
+    /// Start lightweight GPS updates for the real-position marker and Locate.
     func startLocationUpdates() {
         locationKeeper.start()
     }
 
     func startJoystick(pairing: PairingStore) {
         guard pairing.hasPairingFile else {
-            lastError = "Import an RPPairing file in Settings first."
+            lastError = "Pair this iPhone in Settings first."
             return
         }
-        let start = simulated ?? pin ?? locationKeeper.lastKnownCoordinate
+        let start = simulated ?? pin ?? realCoordinate
         guard let start else {
-            lastError = "Drop a pin or teleport somewhere before using the joystick."
+            lastError = "Place a position on the map first."
             return
         }
+        routeTask?.cancel()
+        routeTask = nil
+        followingRoute = false
         if simulated == nil {
+            liveName = pinName
             apply(start, pairing: pairing, markRecent: false)
         }
         joystickActive = true
@@ -180,11 +233,18 @@ final class SpoofSession: ObservableObject {
         joystickTimer = nil
     }
 
-    func followRoute(_ coordinates: [CLLocationCoordinate2D], pairing: PairingStore) {
-        guard pairing.hasPairingFile, coordinates.count >= 2 else { return }
+    func followRoute(_ coordinates: [CLLocationCoordinate2D], name: String? = nil, pairing: PairingStore) {
+        guard pairing.hasPairingFile else {
+            lastError = "Pair this iPhone in Settings first."
+            return
+        }
+        guard coordinates.count >= 2 else { return }
         routeTask?.cancel()
         stopJoystick()
         let mode = travelMode
+        let varies = Prefs.bool(Prefs.speedVariation)
+        liveName = name
+        followingRoute = true
         routeTask = Task { [weak self] in
             guard let self else { return }
             var previous = coordinates[0]
@@ -195,7 +255,7 @@ final class SpoofSession: ObservableObject {
                 if Task.isCancelled { break }
                 let distance = CLLocation(latitude: previous.latitude, longitude: previous.longitude)
                     .distance(from: CLLocation(latitude: next.latitude, longitude: next.longitude))
-                var speed = mode.baseSpeed * Double.random(in: 0.88...1.12)
+                var speed = mode.baseSpeed * (varies ? Double.random(in: 0.88...1.12) : 1)
                 speed = max(0.8, speed)
                 let stepMeters: CLLocationDistance = min(12, max(4, speed * 0.5))
                 let steps = max(1, Int(ceil(distance / stepMeters)))
@@ -214,6 +274,23 @@ final class SpoofSession: ObservableObject {
                 }
                 previous = next
             }
+            await MainActor.run {
+                if !Task.isCancelled { self.followingRoute = false }
+            }
+        }
+    }
+
+    // MARK: - Favourites, recents, routes
+
+    func isFavorite(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        favorites.contains { Coord.same($0.coordinate, coordinate) }
+    }
+
+    func toggleFavorite(_ coordinate: CLLocationCoordinate2D, name: String?) {
+        if let existing = favorites.first(where: { Coord.same($0.coordinate, coordinate) }) {
+            removeFavorite(existing)
+        } else {
+            addFavorite(name: name ?? suggestedFavoriteName(for: coordinate), coordinate: coordinate)
         }
     }
 
@@ -221,8 +298,7 @@ final class SpoofSession: ObservableObject {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let place = SavedPlace(
             name: trimmed.isEmpty ? Self.coordinateLabel(coordinate) : trimmed,
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude
+            coordinate: coordinate
         )
         // Don't let a generic star overwrite a named favorite for the same spot.
         if let existing = favorites.first(where: { $0.id == place.id }),
@@ -253,12 +329,36 @@ final class SpoofSession: ObservableObject {
         SavedPlace.save(recents, key: recentsKey)
     }
 
-    /// Best display name for starring the current pin (search title, matching recent, etc.).
+    func saveRoute(name: String, coordinates: [CLLocationCoordinate2D]) {
+        guard coordinates.count >= 2 else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let route = SavedRoute(
+            name: trimmed.isEmpty ? "Route \(savedRoutes.count + 1)" : trimmed,
+            coordinates: coordinates,
+            mode: travelMode
+        )
+        savedRoutes.insert(route, at: 0)
+        SavedRoute.save(savedRoutes, key: routesKey)
+    }
+
+    func renameRoute(_ route: SavedRoute, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = savedRoutes.firstIndex(where: { $0.id == route.id }) else { return }
+        savedRoutes[index].name = trimmed
+        SavedRoute.save(savedRoutes, key: routesKey)
+    }
+
+    func removeRoute(_ route: SavedRoute) {
+        savedRoutes.removeAll { $0.id == route.id }
+        SavedRoute.save(savedRoutes, key: routesKey)
+    }
+
+    /// Best display name for starring a position (search title, matching recent, etc.).
     func suggestedFavoriteName(for coordinate: CLLocationCoordinate2D, fallback: String? = nil) -> String {
         if let fallback, !fallback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return fallback.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        if let favorite = favorites.first(where: { $0.id == SavedPlace(name: "", latitude: coordinate.latitude, longitude: coordinate.longitude).id }),
+        if let favorite = favorites.first(where: { Coord.same($0.coordinate, coordinate) }),
            !Self.isGenericFavoriteName(favorite.name) {
             return favorite.name
         }
@@ -271,13 +371,14 @@ final class SpoofSession: ObservableObject {
     }
 
     private static func coordinateLabel(_ coordinate: CLLocationCoordinate2D) -> String {
-        String(format: "%.5f, %.5f", coordinate.latitude, coordinate.longitude)
+        Coord.format(coordinate)
     }
 
     private static func isGenericFavoriteName(_ name: String) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed == "Favorite" { return true }
-        // Coordinate-looking labels from older teleports.
+        if trimmed.hasSuffix("° E") || trimmed.hasSuffix("° W") { return true }
+        // Coordinate-looking labels from older builds.
         let parts = trimmed.split(separator: ",")
         if parts.count == 2,
            Double(parts[0].trimmingCharacters(in: .whitespaces)) != nil,
@@ -285,6 +386,14 @@ final class SpoofSession: ObservableObject {
             return true
         }
         return false
+    }
+
+    // MARK: - Engine
+
+    private func receiveDeviceLocation(_ coordinate: CLLocationCoordinate2D) {
+        // While a position is live the device reports that position, not where you are.
+        guard simulated == nil, status == .idle else { return }
+        realLocation = coordinate
     }
 
     private func apply(_ coordinate: CLLocationCoordinate2D, pairing: PairingStore, markRecent: Bool) {
@@ -301,26 +410,57 @@ final class SpoofSession: ObservableObject {
         isBusy = false
         switch result {
         case .success:
+            track(from: simulated, to: coordinate, jumped: markRecent)
             simulated = coordinate
             pin = coordinate
             status = .active
             lastError = nil
             beginBackground()
+            locationKeeper.setPrecise(false)
             locationKeeper.start()
             startResend(pairing: pairing)
             startHealth(pairing: pairing)
             if markRecent {
-                pushRecent(coordinate)
+                pushNamedRecent(name: liveName ?? Self.coordinateLabel(coordinate), coordinate: coordinate)
             }
         case .failure(let error):
             lastError = error.localizedDescription
             if simulated != nil {
                 status = .dropped(error.localizedDescription)
-                postDropNotification(error.localizedDescription)
+                postDropNotification()
             } else {
                 status = .idle
             }
         }
+    }
+
+    /// Heading and trail for the live marker. A jump (Move here) resets both;
+    /// the marker points north when still.
+    private func track(from previous: CLLocationCoordinate2D?, to next: CLLocationCoordinate2D, jumped: Bool) {
+        guard !jumped, let previous else {
+            if jumped {
+                heading = 0
+                trail = []
+            }
+            return
+        }
+        guard Coord.distance(previous, next) > 0.3 else { return }
+        var bearing = Self.bearing(from: previous, to: next)
+        while bearing - heading > 180 { bearing -= 360 }
+        while bearing - heading < -180 { bearing += 360 }
+        heading = bearing
+        if trail.isEmpty { trail.append(previous) }
+        trail.append(next)
+        if trail.count > 600 { trail.removeFirst(trail.count - 600) }
+    }
+
+    private static func bearing(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
+        let lat1 = a.latitude * .pi / 180
+        let lat2 = b.latitude * .pi / 180
+        let dLon = (b.longitude - a.longitude) * .pi / 180
+        let y = sin(dLon) * cos(lat2)
+        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        return atan2(y, x) * 180 / .pi
     }
 
     private func tickJoystick(pairing: PairingStore) {
@@ -329,7 +469,8 @@ final class SpoofSession: ObservableObject {
         guard magnitude > 0.08 else { return }
         let nx = joystickVector.dx / magnitude
         let ny = -joystickVector.dy / magnitude
-        let speed = travelMode.baseSpeed * min(1.0, magnitude) * Double.random(in: 0.9...1.1)
+        let variation = Prefs.bool(Prefs.speedVariation) ? Double.random(in: 0.9...1.1) : 1
+        let speed = travelMode.baseSpeed * min(1.0, magnitude) * variation
         let dt = 0.25
         let meters = speed * dt
         let next = offset(coordinate: current, eastMeters: nx * meters, northMeters: ny * meters)
@@ -377,19 +518,11 @@ final class SpoofSession: ObservableObject {
         healthTimer = nil
     }
 
-    private func pushRecent(_ coordinate: CLLocationCoordinate2D) {
-        pushNamedRecent(
-            name: Self.coordinateLabel(coordinate),
-            coordinate: coordinate
-        )
-    }
-
     func pushNamedRecent(name: String, coordinate: CLLocationCoordinate2D) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let place = SavedPlace(
             name: trimmed.isEmpty ? Self.coordinateLabel(coordinate) : trimmed,
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude
+            coordinate: coordinate
         )
         recents.removeAll {
             abs($0.latitude - place.latitude) < 0.00015 && abs($0.longitude - place.longitude) < 0.00015
@@ -412,11 +545,12 @@ final class SpoofSession: ObservableObject {
         backgroundTask = .invalid
     }
 
-    private func postDropNotification(_ message: String) {
+    private func postDropNotification() {
+        guard Prefs.bool(Prefs.interruptionAlerts) else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         let content = UNMutableNotificationContent()
-        content.title = "Locus spoof dropped"
-        content.body = message
+        content.title = "Trace"
+        content.body = "Interrupted. Reconnecting."
         content.sound = .default
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)

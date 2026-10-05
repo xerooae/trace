@@ -17,7 +17,7 @@ enum RouteBuilder {
         let directions = MKDirections(request: request)
         let response = try await directions.calculate()
         guard let route = response.routes.first else {
-            throw NSError(domain: "Locus", code: 1, userInfo: [NSLocalizedDescriptionKey: "No route found"])
+            throw NSError(domain: "Trace", code: 1, userInfo: [NSLocalizedDescriptionKey: "No route found between these places."])
         }
         return sample(polyline: route.polyline, every: 12)
     }
@@ -79,15 +79,15 @@ enum GPXCodec {
             }
         }
         guard !coords.isEmpty else {
-            throw NSError(domain: "Locus", code: 2, userInfo: [NSLocalizedDescriptionKey: "No track points found in GPX"])
+            throw NSError(domain: "Trace", code: 2, userInfo: [NSLocalizedDescriptionKey: "That GPX file has no track points."])
         }
         return coords
     }
 
-    static func export(_ coordinates: [CLLocationCoordinate2D], name: String = "Locus Route") -> String {
+    static func export(_ coordinates: [CLLocationCoordinate2D], name: String = "Trace Route") -> String {
         var body = """
         <?xml version="1.0" encoding="UTF-8"?>
-        <gpx version="1.1" creator="Locus" xmlns="http://www.topografix.com/GPX/1/1">
+        <gpx version="1.1" creator="Trace" xmlns="http://www.topografix.com/GPX/1/1">
           <trk>
             <name>\(name)</name>
             <trkseg>
@@ -102,5 +102,17 @@ enum GPXCodec {
         </gpx>
         """
         return body
+    }
+
+    /// Writes the route to a temporary .gpx file for sharing.
+    static func temporaryFile(for coordinates: [CLLocationCoordinate2D], name: String) -> URL? {
+        let safeName = name.replacingOccurrences(of: "/", with: "-")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(safeName).gpx")
+        do {
+            try export(coordinates, name: name).data(using: .utf8)?.write(to: url)
+            return url
+        } catch {
+            return nil
+        }
     }
 }

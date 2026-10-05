@@ -108,8 +108,8 @@ final class PairOnDeviceService: ObservableObject {
     fileprivate func handleConnected() {
         phase = .deviceConnected
         Self.postPlainNotification(
-            title: "Locus connected",
-            body: "Generating pairing code…"
+            title: "Trace connected",
+            body: "Making your pairing code…"
         )
     }
 
@@ -125,8 +125,8 @@ final class PairOnDeviceService: ObservableObject {
         phase = .succeeded
         teardown()
         Self.postPlainNotification(
-            title: "Locus paired",
-            body: "RPPairing is ready. Connect LocalDevVPN, then teleport."
+            title: "Trace paired",
+            body: "This iPhone is paired. Connect LocalDevVPN, then move."
         )
     }
 
@@ -166,7 +166,7 @@ final class PairOnDeviceService: ObservableObject {
 
     private static func postPINNotification(_ pin: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Locus pairing code"
+        content.title = "Trace pairing code"
         content.body = pin
         content.sound = .default
         if #available(iOS 15.0, *) {
@@ -186,7 +186,7 @@ final class PairOnDeviceService: ObservableObject {
     }
 
     private static func runBlockingAccept(outputPath: String, box: PairCallbackBox) {
-        let name = "Locus"
+        let name = "Trace"
         let model = "Mac17,7"
 
         var outFile: OpaquePointer?
@@ -304,7 +304,7 @@ private func listeningTrampoline(
     let values = (
         port,
         serviceIdentifier.map { String(cString: $0) } ?? "",
-        name.map { String(cString: $0) } ?? "Locus",
+        name.map { String(cString: $0) } ?? "Trace",
         model.map { String(cString: $0) } ?? "Mac17,7",
         authTag.map { String(cString: $0) } ?? "",
         ver.map { String(cString: $0) } ?? "26",

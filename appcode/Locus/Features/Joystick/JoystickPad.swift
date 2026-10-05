@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Floats above the tray on the thumb side. Clear glass base, hairline ring, ink knob.
 struct JoystickPad: View {
     var onChange: (CGVector) -> Void
 
@@ -9,17 +10,18 @@ struct JoystickPad: View {
     var body: some View {
         ZStack {
             Circle()
-                .frame(width: radius * 2 + 28, height: radius * 2 + 28)
-                .locusGlass(.clear, in: Circle())
+                .fill(Color.clear)
+                .frame(width: 148, height: 148)
+                .traceGlass(.clear, in: Circle())
 
             Circle()
-                .stroke(LocusTheme.accent.opacity(0.4), lineWidth: 2)
+                .stroke(TraceTheme.hairline, lineWidth: 1)
                 .frame(width: radius * 2, height: radius * 2)
 
             Circle()
-                .fill(LocusTheme.accent)
-                .frame(width: 44, height: 44)
-                .shadow(color: LocusTheme.accent.opacity(0.45), radius: 8)
+                .fill(TraceTheme.ink)
+                .frame(width: 52, height: 52)
+                .shadow(color: .black.opacity(0.5), radius: 6, y: 4)
                 .offset(dragOffset)
                 .gesture(
                     DragGesture(minimumDistance: 0)
@@ -29,14 +31,17 @@ struct JoystickPad: View {
                             onChange(CGVector(dx: limited.width / radius, dy: limited.height / radius))
                         }
                         .onEnded { _ in
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                            withAnimation(.spring(duration: 0.25, bounce: 0)) {
                                 dragOffset = .zero
                             }
                             onChange(.zero)
                         }
                 )
         }
-        .accessibilityLabel("Movement joystick")
+        .frame(width: 148, height: 148)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Joystick")
+        .accessibilityHint("Drag to move in any direction.")
     }
 
     private func clamp(_ translation: CGSize, radius: CGFloat) -> CGSize {

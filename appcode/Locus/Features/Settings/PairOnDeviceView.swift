@@ -1,42 +1,27 @@
 import SwiftUI
 
+/// iOS 27 on-device pairing. Reading at the top (steps, the code), actions at the bottom.
 struct PairOnDeviceView: View {
     enum Mode {
-        /// Settings sheet — Close toolbar, dismiss on Done.
-        case sheet
-        /// First-run setup — no toolbar; calls `onFinished` after success.
+        /// First run: calls `onFinished` after success.
         case embedded
+        /// Pushed from Settings › Pairing: Done pops back.
+        case pushed
     }
+
+    var mode: Mode = .pushed
+    var onFinished: (() -> Void)? = nil
 
     @EnvironmentObject private var pairing: PairingStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-
     @StateObject private var host = PairOnDeviceService()
 
-    var mode: Mode = .sheet
-    var onFinished: (() -> Void)?
-
     var body: some View {
-        Group {
-            if mode == .sheet {
-                NavigationStack {
-                    scrollContent
-                        .background(Color.black.ignoresSafeArea())
-                        .navigationTitle("Pair on this iPhone")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Close") {
-                                    host.resetToIdle()
-                                    dismiss()
-                                }
-                            }
-                        }
-                }
-            } else {
-                scrollContent
-            }
+        StepLayout(title, message: message) {
+            content
+        } actions: {
+            actions
         }
         .onChange(of: host.phase) { _, phase in
             if case .succeeded = phase {
@@ -48,201 +33,104 @@ struct PairOnDeviceView: View {
                 _ = host.pin
             }
         }
-    }
-
-    private var scrollContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                if mode == .sheet {
-                    header
-                } else {
-                    embeddedIntro
-                }
-
-                steps
-
-                statusCard
-
-                if mode == .sheet {
-                    tipCard
-                }
-
-                actions
-            }
-            .padding(mode == .embedded ? 16 : 20)
+        .onDisappear {
+            if host.isBusy { host.resetToIdle() }
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("No computer needed")
-                .font(.title2.weight(.bold))
-            Text("Locus advertises a pairable host. iOS connects from Developer Mode, then Locus shows a 6-digit code for you to type.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    private var title: String {
+        switch host.phase {
+        case .idle: return "Pair this iPhone"
+        case .advertising: return "Open Settings"
+        case .deviceConnected: return "Almost there"
+        case .awaitingPIN: return "Type this code in Settings"
+        case .succeeded: return "Paired"
+        case .failed: return "Pairing didn't finish"
         }
     }
 
-    private var embeddedIntro: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Follow these steps")
-                .font(.headline)
-            Text("Keep Locus open. You’ll leave briefly for Settings, then come back with a code.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    private var message: String {
+        switch host.phase {
+        case .idle:
+            return "A one-time pairing lets Trace set your position. You won't need a computer."
+        case .advertising:
+            return "Go to Settings › Privacy & Security › Developer Mode › Pair with Host, then tap Pair with Trace. Keep Trace running."
+        case .deviceConnected:
+            return "Your iPhone connected. Trace is making your code."
+        case .awaitingPIN:
+            return "Settings asks for your passcode first. The code goes in the second prompt."
+        case .succeeded:
+            return mode == .embedded ? "This iPhone is paired. Next, the tunnel." : "This iPhone is paired."
+        case .failed(let reason):
+            return reason
         }
     }
 
-    private var steps: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            step(1, "Tap Start pairing and allow Local Network + Location when asked.")
-            step(2, "Allow notifications — the code can appear as a banner over Settings.")
-            step(3, "Open Settings › Privacy & Security › Developer Mode › Pair with Locus → Pair.")
-            step(4, "Enter your unlock passcode first. On the next prompt, type Locus’s 6-digit code.")
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .locusGlass(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private func step(_ n: Int, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("\(n)")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.black)
-                .frame(width: 22, height: 22)
-                .background(LocusTheme.accent, in: Circle())
-            Text(text)
-                .font(.subheadline)
-                .foregroundStyle(.primary)
-        }
-    }
-
-    private var tipCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("If the code isn’t here yet", systemImage: "lightbulb.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(LocusTheme.accentSecondary)
-            Text("Keep the app listening while you confirm in Developer Mode. Don’t force-quit. If “Pair with Locus” vanishes, stop/start pairing and reopen Developer Mode.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LocusTheme.accentSecondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    @ViewBuilder
-    private var statusCard: some View {
-        VStack(spacing: 14) {
-            switch host.phase {
-            case .idle:
-                Label("Ready when you are", systemImage: "antenna.radiowaves.left.and.right")
-                    .foregroundStyle(.secondary)
-            case .advertising:
-                ProgressView()
-                Text("Waiting for Settings…")
-                    .font(.headline)
-                Text("In Developer Mode tap Pair with Locus → Pair.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            case .deviceConnected:
-                ProgressView()
-                Text("iPhone connected")
-                    .font(.headline)
-                Text("Generating your 6-digit code…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            case .awaitingPIN(let pin):
-                Text("Enter this code in Settings")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(pin)
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
-                    .tracking(10)
-                    .monospacedDigit()
-                    .foregroundStyle(LocusTheme.accent)
-                    .textSelection(.enabled)
-                Text("Second prompt only — after your unlock passcode.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            case .succeeded:
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.largeTitle)
-                    .foregroundStyle(LocusTheme.statusGood)
-                Text("Paired")
-                    .font(.title3.weight(.bold))
-                Text(mode == .embedded
-                     ? "Next we’ll set up LocalDevVPN."
-                     : "RPPairing file saved. Connect LocalDevVPN, then teleport.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            case .failed(let message):
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.largeTitle)
-                    .foregroundStyle(LocusTheme.statusWarn)
-                Text("Pairing failed")
-                    .font(.title3.weight(.bold))
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(24)
-        .locusGlass(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    @ViewBuilder
-    private var actions: some View {
+    @ViewBuilder private var content: some View {
         switch host.phase {
         case .idle, .failed:
-            Button {
+            StepsCard(steps: [
+                "Tap Start pairing, and allow Local Network and notifications when asked.",
+                "Open Settings › Privacy & Security › Developer Mode › Pair with Host.",
+                "Enter your passcode, then type the six-digit code Trace shows you.",
+            ])
+        case .advertising, .deviceConnected:
+            HStack(spacing: 10) {
+                PositionMarker(state: .connecting, width: 11)
+                Text("Waiting for Settings…")
+                    .font(.subheadline)
+                    .foregroundStyle(TraceTheme.ink2)
+            }
+            .padding(.top, 8)
+        case .awaitingPIN(let pin):
+            Text(Self.grouped(pin))
+                .font(.system(size: 46, weight: .medium, design: .monospaced))
+                .tracking(4)
+                .foregroundStyle(TraceTheme.ink)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 28)
+                .accessibilityLabel("Pairing code \(pin.map(String.init).joined(separator: " "))")
+        case .succeeded:
+            BearingShape()
+                .fill(TraceTheme.ink)
+                .frame(width: 36, height: 48)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+                .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder private var actions: some View {
+        switch host.phase {
+        case .idle, .failed:
+            Button(host.phase == .idle ? "Start pairing" : "Try again") {
                 host.acknowledgeFailure()
                 host.start(pairingStore: pairing)
-            } label: {
-                Text(host.phase == .idle ? "Start pairing" : "Try again")
-                    .font(.headline)
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Capsule().fill(LocusTheme.accent))
-                    .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TracePrimaryButtonStyle(height: 56))
         case .succeeded:
-            Button {
+            Button(mode == .embedded ? "Continue" : "Done") {
                 if let onFinished {
                     onFinished()
                 } else {
                     dismiss()
                 }
-            } label: {
-                Text(mode == .embedded ? "Continue" : "Done")
-                    .font(.headline)
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Capsule().fill(LocusTheme.accent))
-                    .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(TracePrimaryButtonStyle(height: 56))
         case .advertising, .deviceConnected, .awaitingPIN:
-            Text({
-                switch host.phase {
-                case .awaitingPIN: return "Type the code above into the second Settings prompt."
-                case .deviceConnected: return "Connected — code coming next."
-                default: return "Waiting for iOS to connect… don’t force-quit Locus."
-                }
-            }())
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
+            Text("Don't force-quit Trace while you're in Settings.")
+                .font(.footnote)
+                .foregroundStyle(TraceTheme.ink3)
                 .multilineTextAlignment(.center)
+            Button("Cancel") { host.resetToIdle() }
+                .buttonStyle(TraceGlassButtonStyle(height: 56))
         }
+    }
+
+    /// "418207" → "418 207"
+    private static func grouped(_ pin: String) -> String {
+        guard pin.count == 6 else { return pin }
+        return "\(pin.prefix(3)) \(pin.suffix(3))"
     }
 }

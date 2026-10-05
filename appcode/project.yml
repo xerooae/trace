@@ -2,7 +2,7 @@ name: Locus
 options:
   bundleIdPrefix: com.chrismack
   deploymentTarget:
-    iOS: "18.0"
+    iOS: "26.0"
   xcodeVersion: "16.0"
   createIntermediateGroups: true
   # Icon Composer packages must be treated as a single file, not exploded.
@@ -15,7 +15,7 @@ settings:
     DEVELOPMENT_TEAM: ""
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1,2"
-    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
 targets:
   Locus:
     type: application

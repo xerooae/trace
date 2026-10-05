@@ -1,0 +1,101 @@
+import SwiftUI
+
+@main
+struct TraceApp: App {
+    @StateObject private var session = SpoofSession()
+    @StateObject private var pairing = PairingStore()
+    @StateObject private var accounts = AccountStore()
+    @StateObject private var router = AppRouter()
+    @AppStorage(Prefs.setupComplete) private var setupComplete = false
+
+    var body: some Scene {
+        WindowGroup {
+            Group {
+                // Gates replace the tab view entirely: first run, then plan access.
+                if accounts.account == nil || !setupComplete {
+                    OnboardingView(startsSignedIn: accounts.account != nil)
+                } else if !accounts.hasFullAccess {
+                    PlanView(mode: .ended)
+                } else {
+                    AppTabs()
+                }
+            }
+            .environmentObject(session)
+            .environmentObject(pairing)
+            .environmentObject(accounts)
+            .environmentObject(router)
+            .preferredColorScheme(.dark)
+            .tint(.white)
+            .onOpenURL(perform: handleIncoming)
+        }
+    }
+
+    private func handleIncoming(_ url: URL) {
+        let ext = url.pathExtension.lowercased()
+        if ["plist", "mobiledevicepairing", "mobiledevicepair"].contains(ext) {
+            do {
+                try pairing.importPairing(from: url)
+            } catch {
+                session.lastError = error.localizedDescription
+            }
+        } else if ext == "gpx" {
+            router.tab = .map
+            NotificationCenter.default.post(name: .traceImportGPX, object: url)
+        }
+    }
+}
+
+extension Notification.Name {
+    static let traceImportGPX = Notification.Name("traceImportGPX")
+}
+
+enum AppTab: Hashable {
+    case map, places, settings
+}
+
+/// Cross-tab requests: Places asks the Map to show a place or open a route.
+@MainActor
+final class AppRouter: ObservableObject {
+    @Published var tab: AppTab = .map
+    /// The map moves its camera here, then clears it.
+    @Published var cameraTarget: SavedPlace?
+    /// The map opens Routes toward this place, then clears it.
+    @Published var routeDestination: SavedPlace?
+    /// The map loads this saved route into Routes, then clears it.
+    @Published var routeToLoad: SavedRoute?
+}
+
+/// Three tabs: Map · Places · Settings. The account is the first row of Settings.
+struct AppTabs: View {
+    @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var session: SpoofSession
+
+    var body: some View {
+        TabView(selection: $router.tab) {
+            Tab("Map", systemImage: "map", value: AppTab.map) {
+                MapHomeView()
+            }
+            Tab("Places", systemImage: "star", value: AppTab.places) {
+                PlacesView()
+            }
+            Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
+                SettingsView()
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+        .tabBarMinimizeBehavior(.never)
+        .sensoryFeedback(trigger: session.status) { old, new in
+            if new == .active && old != .active { return .success }
+            if new.isDropped && !old.isDropped { return .warning }
+            return nil
+        }
+        .alert("Trace", isPresented: Binding(
+            get: { session.lastError != nil },
+            set: { if !$0 { session.lastError = nil } }
+        )) {
+            Button("OK", role: .cancel) { session.lastError = nil }
+        } message: {
+            Text(session.lastError ?? "")
+        }
+    }
+}

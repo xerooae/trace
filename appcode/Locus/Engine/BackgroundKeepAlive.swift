@@ -4,6 +4,8 @@ import Foundation
 final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private(set) var lastKnownCoordinate: CLLocationCoordinate2D?
+    /// Called on the main thread with each fix.
+    var onUpdate: ((CLLocationCoordinate2D) -> Void)?
 
     override init() {
         super.init()
@@ -23,7 +25,15 @@ final class BackgroundKeepAlive: NSObject, CLLocationManagerDelegate {
         manager.stopUpdatingLocation()
     }
 
+    /// Coarse while a position is live (it only keeps the app awake), finer when
+    /// idle so the real-position marker lands close to where you are.
+    func setPrecise(_ precise: Bool) {
+        manager.desiredAccuracy = precise ? kCLLocationAccuracyHundredMeters : kCLLocationAccuracyThreeKilometers
+    }
+
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        lastKnownCoordinate = locations.last?.coordinate
+        guard let coordinate = locations.last?.coordinate else { return }
+        lastKnownCoordinate = coordinate
+        onUpdate?(coordinate)
     }
 }
