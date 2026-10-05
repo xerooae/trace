@@ -404,17 +404,7 @@ struct MapHomeView: View {
             return
         }
         session.placeCandidate(coordinate, name: nil)
-        lookUpName(for: coordinate)
-    }
-
-    private func lookUpName(for coordinate: CLLocationCoordinate2D) {
-        Task {
-            let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-            guard let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first,
-                  Coord.same(session.pin, coordinate),
-                  session.pinName == nil else { return }
-            session.pinName = placemark.name ?? placemark.locality
-        }
+        session.nameCandidate(coordinate)
     }
 
     private func focus(_ coordinate: CLLocationCoordinate2D, meters: CLLocationDistance = 1200) {

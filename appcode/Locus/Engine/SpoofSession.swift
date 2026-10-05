@@ -138,6 +138,17 @@ final class SpoofSession: ObservableObject {
         pinName = name
     }
 
+    /// Fills in a readable name for an unnamed candidate, if it's still the candidate.
+    func nameCandidate(_ coordinate: CLLocationCoordinate2D) {
+        Task {
+            let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            guard let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first,
+                  Coord.same(pin, coordinate),
+                  pinName == nil else { return }
+            pinName = placemark.name ?? placemark.locality
+        }
+    }
+
     func clearCandidate() {
         pin = simulated
         pinName = nil

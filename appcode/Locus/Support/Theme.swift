@@ -259,6 +259,45 @@ enum Coord {
         return (lat, lon)
     }
 
+    /// Reads typed coordinates: `47.14561, 27.60692`, `47.14561 27.60692`, `-33.89 151.27`,
+    /// `47.1456° N 27.6069° E` or `47.1456N, 27.6069E`. Without N/S/E/W the first
+    /// number is latitude. Returns nil for anything else.
+    static func parse(_ text: String) -> CLLocationCoordinate2D? {
+        let input = text.uppercased().replacingOccurrences(of: "°", with: " ")
+        guard let regex = try? NSRegularExpression(pattern: #"([-+]?\d{1,3}(?:\.\d+)?)\s*([NSEW])?"#) else { return nil }
+        let range = NSRange(input.startIndex..<input.endIndex, in: input)
+        let matches = regex.matches(in: input, range: range)
+        guard matches.count == 2 else { return nil }
+
+        // Only separators may sit around the two numbers.
+        var leftover = input
+        for match in matches.reversed() {
+            if let r = Range(match.range, in: leftover) { leftover.removeSubrange(r) }
+        }
+        guard leftover.allSatisfy({ $0 == " " || $0 == "," || $0 == ";" || $0 == "\t" }) else { return nil }
+
+        var values: [(value: Double, hemisphere: Character?)] = []
+        for match in matches {
+            guard let numberRange = Range(match.range(at: 1), in: input),
+                  let value = Double(input[numberRange]) else { return nil }
+            let hemisphere = Range(match.range(at: 2), in: input).flatMap { input[$0].first }
+            values.append((value, hemisphere))
+        }
+
+        var latitude = values[0].value
+        var longitude = values[1].value
+        let first = values[0].hemisphere, second = values[1].hemisphere
+        if first == "E" || first == "W" || second == "N" || second == "S" {
+            swap(&latitude, &longitude)
+        }
+        for (hemisphere, isLatitude) in [(first, first == "N" || first == "S"), (second, second == "N" || second == "S")] {
+            guard let hemisphere, hemisphere == "S" || hemisphere == "W" else { continue }
+            if isLatitude { latitude = -abs(latitude) } else { longitude = -abs(longitude) }
+        }
+        guard (-90...90).contains(latitude), (-180...180).contains(longitude) else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
     static func same(_ a: CLLocationCoordinate2D?, _ b: CLLocationCoordinate2D?) -> Bool {
         guard let a, let b else { return false }
         return abs(a.latitude - b.latitude) < 0.000001 && abs(a.longitude - b.longitude) < 0.000001

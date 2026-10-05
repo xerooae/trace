@@ -28,6 +28,18 @@ struct SearchView: View {
                         }
                     }
                 } else {
+                    if let coordinate = typedCoordinate {
+                        Section("Coordinates") {
+                            Button {
+                                choose(coordinate, name: nil)
+                            } label: {
+                                row(title: Coord.format(coordinate, decimals: 5),
+                                    subtitle: "Set this position on the map",
+                                    systemImage: "scope",
+                                    mono: false)
+                            }
+                        }
+                    }
                     let saved = matchingSaved
                     if !saved.isEmpty {
                         Section("Saved") {
@@ -50,10 +62,14 @@ struct SearchView: View {
                 }
             }
             .navigationTitle("Search")
-            .searchable(text: $query, prompt: "Search places")
+            .searchable(text: $query, prompt: "Places or coordinates")
             .autocorrectionDisabled()
+            .onSubmit(of: .search) {
+                if let coordinate = typedCoordinate { choose(coordinate, name: nil) }
+            }
             .onChange(of: query) { _, value in
-                completer.query = value.trimmingCharacters(in: .whitespaces)
+                // Coordinates go straight to the map; MapKit has nothing useful to add.
+                completer.query = Coord.parse(value) == nil ? value.trimmingCharacters(in: .whitespaces) : ""
             }
             .overlay {
                 if trimmedQuery.isEmpty && session.favorites.isEmpty && session.recents.isEmpty {
@@ -62,7 +78,7 @@ struct SearchView: View {
                         systemImage: "magnifyingglass",
                         description: Text("Find an address or a landmark, then move there.")
                     )
-                } else if !trimmedQuery.isEmpty && matchingSaved.isEmpty && completer.results.isEmpty {
+                } else if !trimmedQuery.isEmpty && typedCoordinate == nil && matchingSaved.isEmpty && completer.results.isEmpty {
                     ContentUnavailableView.search(text: trimmedQuery)
                 }
             }
@@ -71,6 +87,10 @@ struct SearchView: View {
 
     private var trimmedQuery: String {
         query.trimmingCharacters(in: .whitespaces)
+    }
+
+    private var typedCoordinate: CLLocationCoordinate2D? {
+        Coord.parse(trimmedQuery)
     }
 
     /// Favourites first, then recents that aren't already favourites.
@@ -120,9 +140,11 @@ struct SearchView: View {
     }
 
     /// Places the result on the map as the candidate and switches to the Map tab.
-    private func choose(_ coordinate: CLLocationCoordinate2D, name: String) {
+    /// Typed coordinates have no name, so Trace looks one up.
+    private func choose(_ coordinate: CLLocationCoordinate2D, name: String?) {
         session.placeCandidate(coordinate, name: name)
-        router.cameraTarget = SavedPlace(name: name, coordinate: coordinate)
+        if name == nil { session.nameCandidate(coordinate) }
+        router.cameraTarget = SavedPlace(name: name ?? Coord.format(coordinate), coordinate: coordinate)
         router.tab = .map
         query = ""
     }
