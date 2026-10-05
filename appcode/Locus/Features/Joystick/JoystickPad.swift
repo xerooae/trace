@@ -15,7 +15,7 @@ struct JoystickPad: View {
                 .traceGlass(.clear, in: Circle())
 
             Circle()
-                .stroke(TraceTheme.hairline, lineWidth: 1)
+                .stroke(TraceTheme.separator, lineWidth: 1)
                 .frame(width: radius * 2, height: radius * 2)
 
             Circle()

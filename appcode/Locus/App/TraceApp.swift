@@ -50,7 +50,7 @@ extension Notification.Name {
 }
 
 enum AppTab: Hashable {
-    case map, places, settings
+    case map, places, settings, search
 }
 
 /// Cross-tab requests: Places asks the Map to show a place or open a route.
@@ -65,7 +65,8 @@ final class AppRouter: ObservableObject {
     @Published var routeToLoad: SavedRoute?
 }
 
-/// Three tabs: Map · Places · Settings. The account is the first row of Settings.
+/// Three tabs: Map · Places · Settings, plus search as its own control beside the
+/// tab bar. The account is the first row of Settings.
 struct AppTabs: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: SpoofSession
@@ -80,6 +81,9 @@ struct AppTabs: View {
             }
             Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
                 SettingsView()
+            }
+            Tab(value: AppTab.search, role: .search) {
+                SearchView()
             }
         }
         .tabViewStyle(.sidebarAdaptable)

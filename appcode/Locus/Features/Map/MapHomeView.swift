@@ -20,7 +20,7 @@ struct RouteDraft {
 }
 
 /// Home. Read high, act low: the status pill sits at the top, and every control
-/// is in the tray or floats just above it.
+/// is in the tray or floats just above it. Search lives in its own tab control.
 struct MapHomeView: View {
     @EnvironmentObject private var session: SpoofSession
     @EnvironmentObject private var pairing: PairingStore
@@ -29,19 +29,10 @@ struct MapHomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Prefs.showRealPosition) private var showReal = true
 
-    @StateObject private var search = PlaceSearchCompleter()
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
-    @State private var searchText = ""
-    @State private var searching = false
-    @FocusState private var searchFocused: Bool
     @State private var showRoutes = false
     @State private var route = RouteDraft()
     @State private var tunnelConnected = LocalDevVPN.isConnected
-
-    private enum SearchItem {
-        case favorite(SavedPlace)
-        case completion(MKLocalSearchCompletion)
-    }
 
     private var isRegular: Bool { sizeClass == .regular }
 
@@ -78,7 +69,6 @@ struct MapHomeView: View {
                 onSave: { session.saveRoute(name: $0, coordinates: route.coordinates) }
             )
             .presentationDetents([.medium, .large])
-            .presentationBackground(TraceTheme.graphite)
             .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
         .onAppear {
@@ -157,7 +147,6 @@ struct MapHomeView: View {
         if let live = session.simulated {
             Annotation("", coordinate: live, anchor: .center) {
                 PositionMarker(state: markerState, heading: .degrees(session.heading))
-                    .accessibilityLabel("Live position")
             }
             .annotationTitles(.hidden)
         }
@@ -182,7 +171,6 @@ struct MapHomeView: View {
     // MARK: - Status pill (reading only)
 
     private var statusPill: some View {
-        let showCoordinates = session.isSpoofing || session.status.isDropped
         switch session.status {
         case .idle:
             return StatusPill(
@@ -194,14 +182,11 @@ struct MapHomeView: View {
         case .connecting:
             return StatusPill(state: .connecting, title: "Connecting…", subtitle: "Opening the tunnel", coordinate: nil)
         case .active:
-            return StatusPill(state: .live, title: "Live", subtitle: liveSubtitle,
-                              coordinate: showCoordinates ? session.simulated : nil)
+            return StatusPill(state: .live, title: "Live", subtitle: liveSubtitle, coordinate: session.simulated)
         case .reconnecting:
-            return StatusPill(state: .connecting, title: "Reconnecting…", subtitle: liveSubtitle,
-                              coordinate: session.simulated)
+            return StatusPill(state: .connecting, title: "Reconnecting…", subtitle: liveSubtitle, coordinate: session.simulated)
         case .dropped:
-            return StatusPill(state: .interrupted, title: "Interrupted", subtitle: "Reconnecting…",
-                              coordinate: session.simulated)
+            return StatusPill(state: .interrupted, title: "Interrupted", subtitle: "Reconnecting…", coordinate: session.simulated)
         }
     }
 
@@ -215,11 +200,7 @@ struct MapHomeView: View {
 
     private var bottomStack: some View {
         VStack(spacing: TraceTheme.rowGap) {
-            if searching {
-                searchResults
-            } else {
-                floatingRow
-            }
+            floatingRow
             tray
                 .frame(maxWidth: isRegular ? 400 : .infinity)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -231,7 +212,7 @@ struct MapHomeView: View {
 
     /// Changes whenever the tray's rows change, so rows grow upward smoothly.
     private var trayKey: String {
-        "\(searching)|\(session.joystickActive)|\(session.followingRoute)|\(session.candidate != nil)|\(session.status.label)|\(route.drawing)|\(tunnelConnected)"
+        "\(session.joystickActive)|\(session.followingRoute)|\(session.candidate != nil)|\(session.status.label)|\(route.drawing)|\(tunnelConnected)"
     }
 
     private var floatingRow: some View {
@@ -249,41 +230,43 @@ struct MapHomeView: View {
     }
 
     private var mapButtons: some View {
-        HStack(spacing: 0) {
-            Button(action: cycleMapStyle) {
-                Image(systemName: "square.3.layers.3d")
-                    .frame(width: 44, height: 44)
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                Button(action: cycleMapStyle) {
+                    Image(systemName: "square.3.layers.3d")
+                        .frame(width: 24, height: 24)
+                }
+                .accessibilityLabel(session.mapStyleIndex == 1 ? "Map style: satellite" : "Map style: muted")
+                Button(action: showMyPosition) {
+                    Image(systemName: "location")
+                        .frame(width: 24, height: 24)
+                }
+                .accessibilityLabel("Show my position")
             }
-            .accessibilityLabel(session.mapStyleIndex == 1 ? "Map style: satellite" : "Map style: muted")
-            Button(action: showMyPosition) {
-                Image(systemName: "location")
-                    .frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("Show my position")
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .controlSize(.large)
+            .tint(.white)
         }
-        .font(.body.weight(.medium))
-        .foregroundStyle(TraceTheme.ink)
-        .buttonStyle(.plain)
-        .padding(3)
-        .traceGlass(.regular, interactive: true, in: Capsule())
     }
 
     private var tray: some View {
         VStack(spacing: TraceTheme.rowGap) {
-            if !searching {
-                if route.drawing {
-                    drawingRow
-                } else {
-                    contextRow
-                }
+            if route.drawing {
+                drawingRow
+            } else {
+                contextRow
             }
-            searchRow
-            if !searching {
-                if session.joystickActive || session.followingRoute {
-                    TraceSegmented(options: TravelMode.allCases, selection: $session.travelMode) { $0.title }
+            if session.joystickActive || session.followingRoute {
+                Picker("Travel mode", selection: $session.travelMode) {
+                    ForEach(TravelMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
                 }
-                actionRow
+                .pickerStyle(.segmented)
+                .sensoryFeedback(.selection, trigger: session.travelMode)
             }
+            actionRow
         }
         .padding(TraceTheme.trayPadding)
         .traceGlass(.regular, in: RoundedRectangle(cornerRadius: TraceTheme.trayRadius, style: .continuous))
@@ -310,8 +293,9 @@ struct MapHomeView: View {
                 }
                 .padding(.leading, 6)
                 Spacer(minLength: 8)
-                Button("Connect") { LocalDevVPN.openOrInstall() }
-                    .buttonStyle(TraceGlassButtonStyle(height: 44, expand: false))
+                SecondaryButton("Connect", size: .regular, expand: false) {
+                    LocalDevVPN.openOrInstall()
+                }
             }
         }
     }
@@ -333,22 +317,15 @@ struct MapHomeView: View {
             .padding(.leading, 6)
             .accessibilityElement(children: .combine)
             Spacer(minLength: 8)
-            Button {
+            CircleButton(systemImage: saved ? "star.fill" : "star",
+                         label: saved ? "Remove from Favourites" : "Save to Favourites") {
                 session.toggleFavorite(coordinate, name: favoriteName)
-            } label: {
-                Image(systemName: saved ? "star.fill" : "star")
             }
-            .buttonStyle(TraceIconButtonStyle(size: 44))
-            .accessibilityLabel(saved ? "Remove from Favourites" : "Save to Favourites")
             .sensoryFeedback(.selection, trigger: saved)
             if clearable {
-                Button {
+                CircleButton(systemImage: "xmark", label: "Clear place") {
                     session.clearCandidate()
-                } label: {
-                    Image(systemName: "xmark")
                 }
-                .buttonStyle(TraceIconButtonStyle(size: 44))
-                .accessibilityLabel("Clear place")
             }
         }
     }
@@ -379,196 +356,48 @@ struct MapHomeView: View {
             }
             .padding(.leading, 6)
             Spacer(minLength: 8)
-            Button {
+            CircleButton(systemImage: "arrow.uturn.backward", label: "Undo last point") {
                 _ = route.drawn.popLast()
-            } label: {
-                Image(systemName: "arrow.uturn.backward")
             }
-            .buttonStyle(TraceIconButtonStyle(size: 44))
             .disabled(route.drawn.isEmpty)
-            .accessibilityLabel("Undo last point")
-            Button("Done", action: finishDrawing)
-                .buttonStyle(TraceGlassButtonStyle(height: 44, expand: false))
-        }
-    }
-
-    private var searchRow: some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(TraceTheme.ink3)
-                TextField("Search places", text: $searchText)
-                    .focused($searchFocused)
-                    .submitLabel(.search)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
-                    .onSubmit {
-                        if let first = searchItems.first { select(first) }
-                    }
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(TraceTheme.ink3)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
-                }
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 44)
-            .background(TraceTheme.fill, in: Capsule())
-
-            if searching {
-                Button("Cancel", action: endSearch)
-                    .font(.body)
-                    .foregroundStyle(TraceTheme.ink)
-                    .buttonStyle(.plain)
-                    .frame(minHeight: 44)
-                    .padding(.horizontal, 6)
-            }
-        }
-        .onChange(of: searchFocused) { _, focused in
-            if focused {
-                withAnimation(TraceTheme.motion) { searching = true }
-            }
-        }
-        .onChange(of: searchText) { _, value in
-            search.query = value
+            SecondaryButton("Done", size: .regular, expand: false, action: finishDrawing)
         }
     }
 
     private var actionRow: some View {
         HStack(spacing: TraceTheme.rowGap) {
-            Button {
+            CircleButton(systemImage: "point.topleft.down.to.point.bottomright.curvepath", label: "Routes") {
                 showRoutes = true
-            } label: {
-                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
             }
-            .buttonStyle(TraceIconButtonStyle())
-            .accessibilityLabel("Routes")
-
-            Button(action: toggleJoystick) {
-                Image(systemName: "dot.circle.and.hand.point.up.left.fill")
-            }
-            .buttonStyle(TraceIconButtonStyle(selected: session.joystickActive))
-            .accessibilityLabel("Joystick")
-            .accessibilityAddTraits(session.joystickActive ? .isSelected : [])
-
+            CircleButton(systemImage: "dot.circle.and.hand.point.up.left.fill",
+                         label: "Joystick",
+                         selected: session.joystickActive,
+                         action: toggleJoystick)
             primaryAction
         }
     }
 
-    /// One white action, closest to the thumb. Stop and Cancel are glass.
+    /// One white action, closest to the thumb. Stop and Cancel are bordered, not red.
     @ViewBuilder private var primaryAction: some View {
         if let candidate = session.candidate {
             if session.isSpoofing {
-                Button("Stop") { session.stop(pairing: pairing) }
-                    .buttonStyle(TraceGlassButtonStyle(expand: false))
+                SecondaryButton("Stop", expand: false) { session.stop(pairing: pairing) }
             }
-            Button("Move here") { session.teleport(to: candidate, pairing: pairing) }
-                .buttonStyle(TracePrimaryButtonStyle())
+            PrimaryButton("Move here") { session.teleport(to: candidate, pairing: pairing) }
                 .disabled(session.isBusy)
         } else if session.status == .connecting {
-            Button("Cancel") { session.stop(pairing: pairing) }
-                .buttonStyle(TraceGlassButtonStyle())
+            SecondaryButton("Cancel") { session.stop(pairing: pairing) }
         } else if session.isSpoofing || session.status.isDropped {
-            Button("Stop") { session.stop(pairing: pairing) }
-                .buttonStyle(TraceGlassButtonStyle())
+            SecondaryButton("Stop") { session.stop(pairing: pairing) }
         } else {
-            Button("Move here") {}
-                .buttonStyle(TracePrimaryButtonStyle())
+            PrimaryButton("Move here") {}
                 .disabled(true)
         }
-    }
-
-    // MARK: - Search results (grow upward, best match closest to the thumb)
-
-    private var searchItems: [SearchItem] {
-        let query = searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return [] }
-        let favorites = session.favorites
-            .filter { $0.name.localizedCaseInsensitiveContains(query) }
-            .prefix(2)
-            .map { SearchItem.favorite($0) }
-        let places = search.results
-            .prefix(5)
-            .map { SearchItem.completion($0) }
-        return Array(favorites) + Array(places)
-    }
-
-    @ViewBuilder private var searchResults: some View {
-        let items = searchItems
-        if !items.isEmpty {
-            let rows = Array(Array(items.enumerated()).reversed())
-            VStack(spacing: 0) {
-                ForEach(rows, id: \.offset) { row in
-                    if row.offset < items.count - 1 {
-                        Rectangle()
-                            .fill(TraceTheme.rule)
-                            .frame(height: 1)
-                            .padding(.leading, 54)
-                    }
-                    Button {
-                        select(row.element)
-                    } label: {
-                        resultRow(row.element)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .background(TraceTheme.graphite, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(TraceTheme.hairline, lineWidth: 1))
-            .frame(maxWidth: isRegular ? 400 : .infinity)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private func resultRow(_ item: SearchItem) -> some View {
-        let icon: String
-        let title: String
-        let subtitle: String
-        switch item {
-        case .favorite(let place):
-            icon = "star.fill"
-            title = place.name
-            subtitle = "Favourite"
-        case .completion(let completion):
-            icon = "magnifyingglass"
-            title = completion.title
-            subtitle = completion.subtitle
-        }
-        return HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.body.weight(.medium))
-                .foregroundStyle(TraceTheme.ink2)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .foregroundStyle(TraceTheme.ink)
-                    .lineLimit(1)
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(TraceTheme.ink2)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 56)
-        .contentShape(Rectangle())
     }
 
     // MARK: - Actions
 
     private func handleTap(_ point: CGPoint, proxy: MapProxy) {
-        if searching {
-            endSearch()
-            return
-        }
         guard let coordinate = proxy.convert(point, from: .global) else { return }
         if route.drawing {
             route.drawn.append(coordinate)
@@ -586,33 +415,6 @@ struct MapHomeView: View {
                   session.pinName == nil else { return }
             session.pinName = placemark.name ?? placemark.locality
         }
-    }
-
-    private func select(_ item: SearchItem) {
-        switch item {
-        case .favorite(let place):
-            show(place.coordinate, name: place.name)
-        case .completion(let completion):
-            Task {
-                let request = MKLocalSearch.Request(completion: completion)
-                guard let response = try? await MKLocalSearch(request: request).start(),
-                      let mapItem = response.mapItems.first else { return }
-                show(mapItem.placemark.coordinate, name: mapItem.name ?? completion.title)
-            }
-        }
-    }
-
-    private func show(_ coordinate: CLLocationCoordinate2D, name: String?) {
-        session.placeCandidate(coordinate, name: name)
-        endSearch()
-        focus(coordinate)
-    }
-
-    private func endSearch() {
-        searchFocused = false
-        searchText = ""
-        search.query = ""
-        withAnimation(TraceTheme.motion) { searching = false }
     }
 
     private func focus(_ coordinate: CLLocationCoordinate2D, meters: CLLocationDistance = 1200) {
@@ -741,36 +543,5 @@ struct StatusPill: View {
         .traceGlass(.regular, in: Capsule())
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)
-    }
-}
-
-@MainActor
-final class PlaceSearchCompleter: NSObject, ObservableObject, MKLocalSearchCompleterDelegate {
-    @Published var results: [MKLocalSearchCompletion] = []
-    private let completer = MKLocalSearchCompleter()
-
-    var query: String = "" {
-        didSet {
-            if query.isEmpty {
-                results = []
-            } else {
-                completer.queryFragment = query
-            }
-        }
-    }
-
-    override init() {
-        super.init()
-        completer.delegate = self
-        completer.resultTypes = [.address, .pointOfInterest]
-    }
-
-    nonisolated func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        let items = completer.results
-        Task { @MainActor in self.results = items }
-    }
-
-    nonisolated func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
-        Task { @MainActor in self.results = [] }
     }
 }

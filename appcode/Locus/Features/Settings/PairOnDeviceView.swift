@@ -104,27 +104,24 @@ struct PairOnDeviceView: View {
     @ViewBuilder private var actions: some View {
         switch host.phase {
         case .idle, .failed:
-            Button(host.phase == .idle ? "Start pairing" : "Try again") {
+            PrimaryButton(host.phase == .idle ? "Start pairing" : "Try again", size: .extraLarge) {
                 host.acknowledgeFailure()
                 host.start(pairingStore: pairing)
             }
-            .buttonStyle(TracePrimaryButtonStyle(height: 56))
         case .succeeded:
-            Button(mode == .embedded ? "Continue" : "Done") {
+            PrimaryButton(mode == .embedded ? "Continue" : "Done", size: .extraLarge) {
                 if let onFinished {
                     onFinished()
                 } else {
                     dismiss()
                 }
             }
-            .buttonStyle(TracePrimaryButtonStyle(height: 56))
         case .advertising, .deviceConnected, .awaitingPIN:
             Text("Don't force-quit Trace while you're in Settings.")
                 .font(.footnote)
                 .foregroundStyle(TraceTheme.ink3)
                 .multilineTextAlignment(.center)
-            Button("Cancel") { host.resetToIdle() }
-                .buttonStyle(TraceGlassButtonStyle(height: 56))
+            SecondaryButton("Cancel", size: .extraLarge) { host.resetToIdle() }
         }
     }
 

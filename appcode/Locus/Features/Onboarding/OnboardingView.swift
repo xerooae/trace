@@ -104,7 +104,7 @@ struct StepProgress: View {
         HStack(spacing: 6) {
             ForEach(0..<count, id: \.self) { i in
                 Capsule()
-                    .fill(i <= index ? Color.white : TraceTheme.hairline)
+                    .fill(i <= index ? Color.white : Color(uiColor: .systemGray4))
                     .frame(width: 40, height: 3)
             }
         }
@@ -140,17 +140,18 @@ struct WelcomeStep: View {
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
             Spacer(minLength: 40)
-            Button("Get started", action: onStart)
-                .buttonStyle(TracePrimaryButtonStyle(height: 56))
+            PrimaryButton("Get started", size: .extraLarge, action: onStart)
             Button("I already have an account", action: onStart)
-                .buttonStyle(TraceTextButtonStyle())
+                .buttonStyle(.borderless)
+                .tint(.secondary)
+                .frame(minHeight: 44)
                 .padding(.top, 6)
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 12)
         .frame(maxWidth: 560)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.ignoresSafeArea())
+        .background(TraceTheme.background.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
     }
 }
@@ -178,15 +179,16 @@ struct AccountStep: View {
             .frame(height: 56)
             .clipShape(Capsule())
 
-            Button {
+            SecondaryButton(size: .extraLarge) {
                 message = AccountError.passkeyUnavailable.localizedDescription
             } label: {
                 Label("Continue with a passkey", systemImage: "person.badge.key")
             }
-            .buttonStyle(TraceGlassButtonStyle(height: 56))
 
             Button("Use email instead", action: onEmail)
-                .buttonStyle(TraceTextButtonStyle())
+                .buttonStyle(.borderless)
+                .tint(.secondary)
+                .frame(minHeight: 44)
 
             Text("By continuing you agree to the Terms and Privacy Policy.")
                 .font(.caption)
@@ -247,9 +249,16 @@ struct EmailStep: View {
                     .padding(.horizontal, 18)
                     .frame(height: 50)
                     .background(TraceTheme.fill, in: Capsule())
-                Button("Continue", action: submit)
-                    .buttonStyle(TracePrimaryButtonStyle(expand: false))
-                    .disabled(email.isEmpty)
+                Button(action: submit) {
+                    Text("Continue")
+                        .font(.headline)
+                        .foregroundStyle(email.isEmpty ? TraceTheme.ink3 : Color.black)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
+                .tint(.white)
+                .disabled(email.isEmpty)
             }
         }
         .onAppear { focused = true }
@@ -315,18 +324,19 @@ struct PlanView: View {
             ForEach(PlanOption.allCases) { option in
                 PlanCard(option: option, selected: plan == option) { plan = option }
             }
-            Button(mode == .choose ? "Subscribe" : "Renew") {
+            PrimaryButton(mode == .choose ? "Subscribe" : "Renew", size: .extraLarge) {
                 // Every account has full access for now; StoreKit purchase goes here.
                 onDone()
             }
-            .buttonStyle(TracePrimaryButtonStyle(height: 56))
             HStack(spacing: 4) {
                 Button("Restore purchases") { onDone() }
                 if mode == .ended {
                     Button("Sign out") { accounts.signOut() }
                 }
             }
-            .buttonStyle(TraceTextButtonStyle())
+            .buttonStyle(.borderless)
+            .tint(.secondary)
+            .frame(minHeight: 44)
             Text("\(plan.terms) Placeholder prices.")
                 .font(.caption)
                 .foregroundStyle(TraceTheme.ink3)
@@ -347,7 +357,7 @@ struct PlanCard: View {
                 ZStack {
                     Circle()
                         .fill(selected ? Color.white : Color.clear)
-                        .overlay(Circle().stroke(selected ? Color.clear : TraceTheme.ink3, lineWidth: 1.5))
+                        .overlay(Circle().stroke(selected ? Color.clear : Color(uiColor: .systemGray3), lineWidth: 1.5))
                     if selected {
                         Image(systemName: "checkmark")
                             .font(.caption.weight(.bold))
@@ -367,12 +377,12 @@ struct PlanCard: View {
             }
             .padding(.horizontal, 18)
             .frame(minHeight: 72)
-            .background(TraceTheme.graphite, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(TraceTheme.cell, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(selected ? Color.white : TraceTheme.hairline, lineWidth: selected ? 1.5 : 1)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(selected ? Color.white : Color.clear, lineWidth: 1.5)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -422,16 +432,14 @@ struct ImportPairingStep: View {
                     .padding(.top, 8)
             }
         } actions: {
-            Button("Import pairing file") { showImporter = true }
-                .buttonStyle(TracePrimaryButtonStyle(height: 56))
-            Button("Paste from clipboard") {
+            PrimaryButton("Import pairing file", size: .extraLarge) { showImporter = true }
+            SecondaryButton("Paste from clipboard", size: .extraLarge) {
                 do {
                     try pairing.importPairingFromClipboard()
                 } catch {
                     self.error = error.localizedDescription
                 }
             }
-            .buttonStyle(TraceGlassButtonStyle(height: 56))
         }
         .sheet(isPresented: $showImporter) {
             PairingDocumentPicker(
@@ -476,18 +484,20 @@ struct TunnelStep: View {
                 Text(connected ? "Connected" : installed ? "Not connected" : "Not installed")
                     .foregroundStyle(TraceTheme.ink2)
             }
-            .padding(.horizontal, 18)
-            .frame(minHeight: 56)
-            .background(TraceTheme.graphite, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            .background(TraceTheme.cell, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         } actions: {
             if connected {
-                Button("Start using Trace", action: onDone)
-                    .buttonStyle(TracePrimaryButtonStyle(height: 56))
+                PrimaryButton("Start using Trace", size: .extraLarge, action: onDone)
             } else {
-                Button(installed ? "Open LocalDevVPN" : "Get LocalDevVPN") { LocalDevVPN.openOrInstall() }
-                    .buttonStyle(TracePrimaryButtonStyle(height: 56))
+                PrimaryButton(installed ? "Open LocalDevVPN" : "Get LocalDevVPN", size: .extraLarge) {
+                    LocalDevVPN.openOrInstall()
+                }
                 Button("Skip for now", action: onDone)
-                    .buttonStyle(TraceTextButtonStyle())
+                    .buttonStyle(.borderless)
+                    .tint(.secondary)
+                    .frame(minHeight: 44)
             }
         }
         .onChange(of: scenePhase) { _, phase in
