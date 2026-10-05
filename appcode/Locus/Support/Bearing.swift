@@ -90,7 +90,7 @@ struct PositionMarker: View {
             if reduceMotion {
                 BearingShape().fill(TraceTheme.ink2)
             } else {
-                BearingShape().fill(TraceTheme.accent)
+                BearingShape().fill(TraceTheme.light)
                     .phaseAnimator([1.0, 0.35]) { mark, opacity in
                         mark.opacity(opacity)
                     } animation: { _ in .easeInOut(duration: 0.8) }

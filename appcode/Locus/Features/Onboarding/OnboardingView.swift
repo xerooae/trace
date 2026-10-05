@@ -104,7 +104,7 @@ struct StepProgress: View {
         HStack(spacing: 6) {
             ForEach(0..<count, id: \.self) { i in
                 Capsule()
-                    .fill(i <= index ? Color.white : Color(uiColor: .systemGray4))
+                    .fill(i <= index ? TraceTheme.accent : Color(uiColor: .systemGray4))
                     .frame(width: 40, height: 3)
             }
         }
@@ -143,7 +143,7 @@ struct WelcomeStep: View {
             PrimaryButton("Get started", size: .extraLarge, action: onStart)
             Button("I already have an account", action: onStart)
                 .buttonStyle(.borderless)
-                .tint(.secondary)
+                .tint(TraceTheme.accent)
                 .frame(minHeight: 44)
                 .padding(.top, 6)
         }
@@ -187,7 +187,7 @@ struct AccountStep: View {
 
             Button("Use email instead", action: onEmail)
                 .buttonStyle(.borderless)
-                .tint(.secondary)
+                .tint(TraceTheme.accent)
                 .frame(minHeight: 44)
 
             Text("By continuing you agree to the Terms and Privacy Policy.")
@@ -252,12 +252,12 @@ struct EmailStep: View {
                 Button(action: submit) {
                     Text("Continue")
                         .font(.headline)
-                        .foregroundStyle(email.isEmpty ? TraceTheme.ink3 : Color.black)
+                        .foregroundStyle(email.isEmpty ? TraceTheme.ink3 : Color.white)
                 }
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.capsule)
                 .controlSize(.large)
-                .tint(.white)
+                .tint(TraceTheme.accent)
                 .disabled(email.isEmpty)
             }
         }
@@ -335,7 +335,7 @@ struct PlanView: View {
                 }
             }
             .buttonStyle(.borderless)
-            .tint(.secondary)
+            .tint(TraceTheme.accent)
             .frame(minHeight: 44)
             Text("\(plan.terms) Placeholder prices.")
                 .font(.caption)
@@ -345,7 +345,7 @@ struct PlanView: View {
     }
 }
 
-/// A large choice: white outline and an inverted check, so the action keeps the only white fill.
+/// A large choice: a Trace Blue outline and check.
 struct PlanCard: View {
     let option: PlanOption
     let selected: Bool
@@ -356,12 +356,12 @@ struct PlanCard: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(selected ? Color.white : Color.clear)
+                        .fill(selected ? TraceTheme.accent : Color.clear)
                         .overlay(Circle().stroke(selected ? Color.clear : Color(uiColor: .systemGray3), lineWidth: 1.5))
                     if selected {
                         Image(systemName: "checkmark")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(Color.black)
+                            .foregroundStyle(Color.white)
                     }
                 }
                 .frame(width: 24, height: 24)
@@ -380,7 +380,7 @@ struct PlanCard: View {
             .background(TraceTheme.cell, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(selected ? Color.white : Color.clear, lineWidth: 1.5)
+                    .stroke(selected ? TraceTheme.accent : Color.clear, lineWidth: 1.5)
             )
             .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
@@ -496,7 +496,7 @@ struct TunnelStep: View {
                 }
                 Button("Skip for now", action: onDone)
                     .buttonStyle(.borderless)
-                    .tint(.secondary)
+                    .tint(TraceTheme.accent)
                     .frame(minHeight: 44)
             }
         }

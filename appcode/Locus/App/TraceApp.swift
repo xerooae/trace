@@ -25,7 +25,7 @@ struct TraceApp: App {
             .environmentObject(accounts)
             .environmentObject(router)
             .preferredColorScheme(.dark)
-            .tint(.white)
+            .tint(TraceTheme.accent)
             .onOpenURL(perform: handleIncoming)
         }
     }

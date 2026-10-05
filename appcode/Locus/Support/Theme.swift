@@ -3,9 +3,13 @@ import SwiftUI
 import UIKit
 
 /// Trace colours on top of Apple's semantic system colours, so greys, cells and
-/// separators match the Settings app. Accent stays white; red is for errors only.
+/// separators match the Settings app. Trace Blue marks actions; the Bearing and
+/// the live light stay white; red is for errors only.
 enum TraceTheme {
-    static let accent = Color.white
+    /// Trace Blue, #3D7EFF. White labels on it 3.7:1 (bold), on black 5.6:1, on cells 4.6:1.
+    static let accent = Color(red: 61 / 255, green: 126 / 255, blue: 1)
+    /// The light: the Bearing's light half and the live marker. Never blue.
+    static let light = Color.white
     static let ink = Color.primary
     static let ink2 = Color.secondary
     static let ink3 = Color(uiColor: .tertiaryLabel)
@@ -70,7 +74,7 @@ extension View {
 
 // MARK: - Buttons (native styles)
 
-/// The single white action on a screen: a native prominent capsule, white with a black label.
+/// The single blue action on a screen: a native prominent capsule in Trace Blue with a white label.
 struct PrimaryButton: View {
     let title: String
     var size: ControlSize = .large
@@ -87,19 +91,19 @@ struct PrimaryButton: View {
         Button(action: action) {
             Text(title)
                 .font(.headline)
-                .foregroundStyle(isEnabled ? Color.black : TraceTheme.ink3)
+                .foregroundStyle(isEnabled ? Color.white : TraceTheme.ink3)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
         .controlSize(size)
-        .tint(.white)
+        .tint(TraceTheme.accent)
     }
 }
 
-/// Secondary actions (Stop, Cancel, Route here): a native bordered capsule.
-/// Stopping isn't destructive, so it isn't red.
+/// Secondary actions (Stop, Cancel, Route here): a neutral native bordered capsule,
+/// so the blue action stays the only one. Stopping isn't destructive, so it isn't red.
 struct SecondaryButton<Label: View>: View {
     var size: ControlSize = .large
     var expand = true
@@ -133,7 +137,7 @@ extension SecondaryButton where Label == Text {
     }
 }
 
-/// Round icon buttons in the tray. Selected means inversion: white fill, black glyph.
+/// Round icon buttons in the tray: neutral, or filled with Trace Blue when selected.
 struct CircleButton: View {
     let systemImage: String
     let label: String
@@ -145,13 +149,13 @@ struct CircleButton: View {
         if selected {
             Button(action: action) {
                 Image(systemName: systemImage)
-                    .foregroundStyle(Color.black)
+                    .foregroundStyle(Color.white)
                     .frame(width: 24, height: 24)
             }
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.circle)
             .controlSize(size)
-            .tint(.white)
+            .tint(TraceTheme.accent)
             .accessibilityLabel(label)
             .accessibilityAddTraits(.isSelected)
         } else {
