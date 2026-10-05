@@ -90,16 +90,20 @@ struct PlacesView: View {
             .overlay {
                 if isEmpty { emptyState }
             }
-            .toolbar {
-                ToolbarItem(placement: .bottomBar) {
-                    Picker("Show", selection: $scope) {
-                        ForEach(Scope.allCases, id: \.self) { scope in
-                            Text(scope.title).tag(scope)
-                        }
+            // Above the tab bar, not in a bottom toolbar: inside a TabView on iOS 26
+            // a bottom toolbar renders behind the tab bar.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Picker("Show", selection: $scope) {
+                    ForEach(Scope.allCases, id: \.self) { scope in
+                        Text(scope.title).tag(scope)
                     }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 420)
                 }
+                .pickerStyle(.segmented)
+                .padding(4)
+                .glassEffect(.regular, in: Capsule())
+                .frame(maxWidth: 420)
+                .padding(.horizontal, TraceTheme.gutter)
+                .padding(.bottom, 8)
             }
             .sensoryFeedback(.selection, trigger: scope)
             .sheet(item: $selected) { place in
