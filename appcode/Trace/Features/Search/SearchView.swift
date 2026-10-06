@@ -138,25 +138,6 @@ struct SearchOverlay: View {
     private func resultsPanel(_ sections: [ResultSection]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if sections.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.title2.weight(.medium))
-                            .foregroundStyle(TraceTheme.ink3)
-                        Text(trimmedQuery.isEmpty ? "Search for a place" : "No results for “\(trimmedQuery)”")
-                            .font(.headline)
-                            .foregroundStyle(TraceTheme.ink)
-                        Text(trimmedQuery.isEmpty
-                             ? "Type an address or a landmark, or paste coordinates like 47.1456, 27.6069."
-                             : "Check the spelling, or try coordinates.")
-                            .font(.subheadline)
-                            .foregroundStyle(TraceTheme.ink2)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 48)
-                }
                 ForEach(sections) { section in
                     Text(section.title)
                         .font(.footnote.weight(.semibold))
@@ -179,10 +160,32 @@ struct SearchOverlay: View {
         .scrollIndicators(.automatic)
         .scrollDismissesKeyboard(.never)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .overlay {
+            if sections.isEmpty { emptyState }
+        }
         .clipShape(panelShape)
         .glassEffect(.regular, in: panelShape)
         .padding(.horizontal, 10)
         .padding(.top, 4)
+    }
+
+    /// Centred in the panel. Before typing it's just the icon and the title.
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.title2.weight(.medium))
+                .foregroundStyle(TraceTheme.ink3)
+            Text(trimmedQuery.isEmpty ? "Search for a place" : "No results for “\(trimmedQuery)”")
+                .font(.headline)
+                .foregroundStyle(TraceTheme.ink)
+            if !trimmedQuery.isEmpty {
+                Text("Check the spelling, or try coordinates.")
+                    .font(.subheadline)
+                    .foregroundStyle(TraceTheme.ink2)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 24)
     }
 
     private func rowView(_ row: Row) -> some View {

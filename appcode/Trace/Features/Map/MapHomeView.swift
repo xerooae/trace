@@ -343,6 +343,7 @@ struct MapHomeView: View {
             .accessibilityAddTraits(.updatesFrequently)
             Spacer(minLength: 4)
             lineActions
+                .layoutPriority(1)
         }
         .padding(.leading, 18)
         .padding(.trailing, 8)
@@ -409,35 +410,14 @@ struct MapHomeView: View {
     }
 
     /// A compact capsule inside the line: Trace Blue for Spoof, neutral for the rest.
-    @ViewBuilder private func lineButton(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
-        if primary {
-            Button {
-                Haptics.press()
-                action()
-            } label: {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(Color.white)
-                    .padding(.horizontal, 6)
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-            .tint(TraceTheme.accent)
-        } else {
-            Button {
-                Haptics.tap()
-                action()
-            } label: {
-                Text(title)
-                    .font(.headline)
-                    .padding(.horizontal, 4)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-            .tint(.white)
+    private func lineButton(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            primary ? Haptics.press() : Haptics.tap()
+            action()
+        } label: {
+            Text(title)
         }
+        .buttonStyle(LineButtonStyle(prominent: primary))
     }
 
     /// Long-press menu on the line.
@@ -559,5 +539,28 @@ struct MapHomeView: View {
         } catch {
             session.lastError = error.localizedDescription
         }
+    }
+}
+
+/// The tray's buttons: a capsule 16 pt shorter than the tray, so it sits 8 pt inside
+/// it on every side, with the label centred and never cut short.
+private struct LineButtonStyle: ButtonStyle {
+    var prominent: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundStyle(prominent ? Color.white : TraceTheme.ink)
+            .padding(.horizontal, 20)
+            .frame(minWidth: 80)
+            .frame(height: TraceTheme.barHeight - 16)
+            .background(Capsule().fill(prominent ? TraceTheme.accent : TraceTheme.fill))
+            .contentShape(Capsule())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
