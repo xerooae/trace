@@ -256,12 +256,11 @@ struct MapHomeView: View {
 
     // MARK: - The one line
 
-    /// What the line says: the marker's state, a title, then a word with the
-    /// coordinates (or a short detail when there are none).
+    /// What the line says: the marker's state, a title, then the coordinates
+    /// (or a short detail when there are none). Live says so in the title.
     private struct Line {
         var state: PositionState
         var title: String
-        var word: String? = nil
         var coordinate: CLLocationCoordinate2D? = nil
         var detail: String? = nil
     }
@@ -278,10 +277,11 @@ struct MapHomeView: View {
             return Line(state: .connecting, title: session.status.label, detail: session.liveName ?? "Opening the tunnel")
         }
         if let candidate = session.candidate {
-            return Line(state: .candidate, title: session.pinName ?? "Selected position", word: "Not sent", coordinate: candidate)
+            // The grey marker and the blue Move already say it isn't sent.
+            return Line(state: .candidate, title: session.pinName ?? "Selected position", coordinate: candidate)
         }
         if session.isSpoofing, let live = session.simulated {
-            return Line(state: .live, title: session.liveName ?? "Position set", word: liveWord, coordinate: live)
+            return Line(state: .live, title: liveTitle, coordinate: live)
         }
         if !tunnelConnected {
             return Line(state: .off, title: "LocalDevVPN isn't connected", detail: "Connect it before you move")
@@ -289,11 +289,11 @@ struct MapHomeView: View {
         return Line(state: .off, title: "Off", detail: "Tap the map or search")
     }
 
-    /// "Live", "Live · Joystick", "Live · Route".
-    private var liveWord: String {
+    /// "Live · Shibuya Crossing", "Live · Joystick", "Live · Route".
+    private var liveTitle: String {
         if session.joystickActive { return "Live · Joystick" }
         if session.followingRoute { return "Live · Route" }
-        return "Live"
+        return "Live · \(session.liveName ?? "Position set")"
     }
 
     /// The tray is one glass capsule: the marker, what's happening and where, then the
@@ -308,11 +308,7 @@ struct MapHomeView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(TraceTheme.ink)
                     .lineLimit(1)
-                HStack(spacing: 0) {
-                    if let word = line.word {
-                        Text(line.coordinate == nil ? word : "\(word) · ")
-                            .font(.caption.weight(.semibold))
-                    }
+                Group {
                     if let coordinate = line.coordinate {
                         Text(Coord.format(coordinate))
                             .font(.caption.monospaced())
@@ -323,7 +319,7 @@ struct MapHomeView: View {
                 }
                 .foregroundStyle(TraceTheme.ink2)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(0.7)
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.updatesFrequently)
