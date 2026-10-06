@@ -1,5 +1,7 @@
 import Foundation
+#if !targetEnvironment(simulator)
 import idevice
+#endif
 import UIKit
 import UserNotifications
 import CoreLocation
@@ -186,6 +188,9 @@ final class PairOnDeviceService: ObservableObject {
     }
 
     private static func runBlockingAccept(outputPath: String, box: PairCallbackBox) {
+        #if targetEnvironment(simulator)
+        DispatchQueue.main.async { box.owner?.handleFailure("Pairing needs a real iPhone.") }
+        #else
         let name = "Trace"
         let model = "Mac17,7"
 
@@ -253,6 +258,7 @@ final class PairOnDeviceService: ObservableObject {
 
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outputPath)
         DispatchQueue.main.async { box.owner?.handleSuccess() }
+        #endif
     }
 }
 

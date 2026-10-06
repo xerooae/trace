@@ -61,6 +61,12 @@ xcodebuild -project Trace.xcodeproj -scheme Trace -configuration Release \
   -destination 'generic/platform=iOS' DEVELOPMENT_TEAM=YOUR_TEAM_ID build
 ```
 
+### Design previews
+
+`.github/workflows/preview.yml` builds for the iOS Simulator and uploads it to [Appetize](https://appetize.io), so the UI can be tried in a browser without a Mac. It needs an `APPETIZE_API_TOKEN` secret, plus an `APPETIZE_PUBLIC_KEY` variable after the first upload so later builds update the same link.
+
+Simulator builds can't spoof. They start on the map, paired and signed in, and accept every position so the live UI shows. Launch with `-showOnboarding YES` to go through first run instead.
+
 ## Licence
 
 MIT. Trace is based on [Locus](https://github.com/ChrisMack32/Locus) (MIT), and `Vendor/idevice` contains the idevice FFI (MIT). See [LICENSE](LICENSE).

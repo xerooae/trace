@@ -45,9 +45,9 @@ targets:
         LIBRARY_SEARCH_PATHS:
           - "$(inherited)"
           - "$(PROJECT_DIR)/Vendor/idevice"
+        # idevice is built for iPhone only, so simulator builds (Appetize previews) leave it out.
         OTHER_LDFLAGS:
           - "$(inherited)"
-          - "-lidevice_ffi"
           - "-lc++"
           - "-lz"
         OTHER_LDFLAGS[sdk=iphoneos*]:

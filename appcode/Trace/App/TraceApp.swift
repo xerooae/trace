@@ -8,6 +8,12 @@ struct TraceApp: App {
     @StateObject private var router = AppRouter()
     @AppStorage(Prefs.setupComplete) private var setupComplete = false
 
+    init() {
+        #if targetEnvironment(simulator)
+        SimulatorPreview.prepare()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {

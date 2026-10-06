@@ -1,0 +1,88 @@
+name: Appetize preview
+
+# A simulator build for designing in the browser at appetize.io. It can't spoof:
+# see Support/SimulatorPreview.swift.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - appcode/**
+      - .github/workflows/preview.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: macos-latest
+    env:
+      APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+    defaults:
+      run:
+        working-directory: appcode
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Icon Composer app icon (AppIcon.icon) needs Xcode 26 or newer.
+      - name: Select newest stable Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build for the simulator
+        run: |
+          xcodebuild build \
+            -project Trace.xcodeproj \
+            -scheme Trace \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO
+          cd build/Build/Products/Debug-iphonesimulator
+          zip -qry "$GITHUB_WORKSPACE/appcode/Trace-simulator.zip" Trace.app
+
+      # Kept so the build can be uploaded to Appetize by hand if the API isn't set up.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Trace-simulator
+          path: appcode/Trace-simulator.zip
+
+      # Without APPETIZE_PUBLIC_KEY this creates a new app; save the key it prints.
+      - name: Upload to Appetize
+        id: appetize
+        if: env.APPETIZE_API_TOKEN != ''
+        uses: appetizeio/github-action-appetize@v1.1.0
+        with:
+          apiToken: ${{ secrets.APPETIZE_API_TOKEN }}
+          publicKey: ${{ vars.APPETIZE_PUBLIC_KEY }}
+          appFile: appcode/Trace-simulator.zip
+          platform: ios
+          note: ${{ github.sha }}
+
+      - name: Preview link
+        if: steps.appetize.outcome == 'success'
+        env:
+          KEY: ${{ steps.appetize.outputs.publicKey }}
+        run: |
+          URL="https://appetize.io/app/$KEY?device=iphone17pro&osVersion=26.0"
+          {
+            echo "### Preview"
+            echo "Map: $URL"
+            echo ""
+            echo "First run: $URL&launchArgs=%5B%22-showOnboarding%22%2C%22YES%22%5D"
+            echo ""
+            echo "Public key: \`$KEY\`"
+          } >> "$GITHUB_STEP_SUMMARY"

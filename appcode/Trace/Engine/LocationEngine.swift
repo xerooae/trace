@@ -1,5 +1,7 @@
 import Foundation
+#if !targetEnvironment(simulator)
 import idevice
+#endif
 
 enum LocationEngineError: LocalizedError {
     case invalidIP
@@ -38,6 +40,23 @@ enum LocationEngineError: LocalizedError {
     }
 }
 
+#if targetEnvironment(simulator)
+/// Simulator builds are for design previews (Appetize) and have no developer
+/// tunnel or idevice. Every position is accepted so the live UI can be shown.
+enum LocationEngine {
+    private(set) static var isSessionActive = false
+
+    static func set(latitude: Double, longitude: Double, pairingPath: String, deviceIP: String) -> Result<Void, LocationEngineError> {
+        isSessionActive = true
+        return .success(())
+    }
+
+    static func clear() -> Result<Void, LocationEngineError> {
+        isSessionActive = false
+        return .success(())
+    }
+}
+#else
 /// Thin Swift wrapper around idevice’s DVT location simulation (injects into locationd).
 enum LocationEngine {
     private static let queue = DispatchQueue(label: "com.xerooae.trace.location", qos: .userInitiated)
@@ -172,3 +191,4 @@ enum LocationEngine {
         return ok
     }
 }
+#endif

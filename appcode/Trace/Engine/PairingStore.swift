@@ -86,6 +86,17 @@ final class PairingStore: ObservableObject {
         hasPairingFile = false
     }
 
+    #if targetEnvironment(simulator)
+    /// Simulator builds can't pair. A placeholder lets the pairing gates pass; the
+    /// simulator LocationEngine never reads it.
+    func installSimulatorPlaceholder() {
+        guard !hasPairingFile,
+              let data = try? PropertyListSerialization.data(fromPropertyList: ["Placeholder": true], format: .xml, options: 0)
+        else { return }
+        try? installPairingData(data)
+    }
+    #endif
+
     private func installPairingData(_ data: Data) throws {
         guard looksLikePairingPlist(data) else {
             throw PairingImportError.invalidContents
