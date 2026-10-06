@@ -115,7 +115,7 @@ struct PlacesView: View {
                     ContentUnavailableView(
                         "No places yet",
                         systemImage: "star",
-                        description: Text("Tap the star on any place to keep it here. Places you move to, and routes you save, appear here too.")
+                        description: Text("Tap the star on any place to keep it here. Places you spoof to, and routes you save, appear here too.")
                     )
                 }
             }
@@ -161,6 +161,7 @@ struct PlacesView: View {
             Spacer()
             if count > kind.limit {
                 Button(expanded.contains(kind) ? "Show less" : "Show all") {
+                    Haptics.select()
                     if expanded.contains(kind) {
                         expanded.remove(kind)
                     } else {
@@ -184,6 +185,7 @@ struct PlacesView: View {
 
     private func placeRow(_ place: SavedPlace, systemImage: String, detail: String, mono: Bool) -> some View {
         Button {
+            Haptics.tap()
             selected = place
         } label: {
             Label {
@@ -205,6 +207,7 @@ struct PlacesView: View {
 
     private func routeRow(_ saved: SavedRoute) -> some View {
         Button {
+            Haptics.tap()
             router.routeToLoad = saved
             router.tab = .map
         } label: {
@@ -249,7 +252,7 @@ struct PlacesView: View {
     }
 }
 
-/// A place opens at the medium detent as a native list, with Move here pinned at
+/// A place opens at the medium detent as a native list, with Spoof here pinned at
 /// the bottom as the one blue action.
 struct PlaceSheet: View {
     let place: SavedPlace
@@ -275,13 +278,14 @@ struct PlaceSheet: View {
                         LabeledContent("From your real position", value: Coord.distanceText(Coord.distance(real, place.coordinate)))
                     }
                     if let date = place.date {
-                        LabeledContent(isFavourite ? "Saved" : "Moved here",
+                        LabeledContent(isFavourite ? "Saved" : "Spoofed here",
                                        value: date.formatted(date: .abbreviated, time: .shortened))
                     }
                 }
 
                 Section {
                     Button {
+                        Haptics.tap()
                         router.routeDestination = place
                         router.tab = .map
                         dismiss()
@@ -294,6 +298,7 @@ struct PlaceSheet: View {
                         }
                     } else {
                         Button {
+                            Haptics.select()
                             session.addFavorite(name: place.name, coordinate: place.coordinate)
                         } label: {
                             RowLabel("Add to Favourites", systemImage: "star")
@@ -320,7 +325,7 @@ struct PlaceSheet: View {
             .navigationTitle(place.name)
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {
-                PrimaryButton("Move here") {
+                PrimaryButton("Spoof here") {
                     session.teleport(to: place.coordinate, name: place.name, pairing: pairing)
                     router.cameraTarget = place
                     router.tab = .map

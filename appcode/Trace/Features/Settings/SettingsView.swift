@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.speedVariation) private var speedVariation = true
     @AppStorage(Prefs.interruptionAlerts) private var interruptionAlerts = true
     @AppStorage(Prefs.showRealPosition) private var showRealPosition = true
+    @AppStorage(Prefs.mapLook) private var mapLook: MapLook = .satellite
     @State private var tunnelConnected = LocalDevVPN.isConnected
 
     var body: some View {
@@ -73,6 +74,13 @@ struct SettingsView: View {
                 }
 
                 Section("Map") {
+                    Picker(selection: $mapLook) {
+                        ForEach(MapLook.allCases) { look in
+                            Text(look.title).tag(look)
+                        }
+                    } label: {
+                        RowLabel("Map style", systemImage: "map")
+                    }
                     Toggle(isOn: $showRealPosition) {
                         RowLabel("Show real position", systemImage: "location")
                     }
@@ -113,6 +121,11 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .sensoryFeedback(.selection, trigger: speedVariation)
+            .sensoryFeedback(.selection, trigger: showRealPosition)
+            .sensoryFeedback(.selection, trigger: interruptionAlerts)
+            .sensoryFeedback(.selection, trigger: mapLook)
+            .sensoryFeedback(.selection, trigger: session.travelMode)
             // Less space above the content: the large title sits in the bar, and the
             // list starts right under it with compact section gaps.
             .toolbarTitleDisplayMode(.inlineLarge)
@@ -334,7 +347,7 @@ struct TunnelSettingsView: View {
                     RowLabel(installed ? "Open LocalDevVPN" : "Get LocalDevVPN", systemImage: "lock.shield")
                 }
             } footer: {
-                Text("LocalDevVPN opens a private tunnel on this iPhone. Start your first move on Wi‑Fi; after that it keeps working on cellular.")
+                Text("LocalDevVPN opens a private tunnel on this iPhone. Start your first spoof on Wi‑Fi; after that it keeps working on cellular.")
             }
 
             Section {

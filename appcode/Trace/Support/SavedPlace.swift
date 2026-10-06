@@ -6,7 +6,7 @@ struct SavedPlace: Identifiable, Codable, Equatable {
     var name: String
     var latitude: Double
     var longitude: Double
-    /// When this was saved or moved to. Missing on places saved by older builds.
+    /// When this was saved or spoofed to. Missing on places saved by older builds.
     var date: Date? = nil
 
     var coordinate: CLLocationCoordinate2D {
@@ -90,12 +90,21 @@ struct SavedRoute: Identifiable, Codable, Equatable {
     }
 }
 
+/// The map's look: colour satellite with labels, or the standard Apple Maps view.
+enum MapLook: String, CaseIterable, Identifiable {
+    case satellite, standard
+
+    var id: String { rawValue }
+    var title: String { self == .satellite ? "Satellite" : "Standard" }
+}
+
 /// UserDefaults keys for settings.
 enum Prefs {
     static let setupComplete = "trace.setupComplete"
     static let speedVariation = "trace.speedVariation"
     static let interruptionAlerts = "trace.interruptionAlerts"
     static let showRealPosition = "trace.showRealPosition"
+    static let mapLook = "trace.mapLook"
 
     static func bool(_ key: String, default value: Bool = true) -> Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? value

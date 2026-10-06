@@ -26,6 +26,7 @@ struct JoystickPad: View {
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
+                            if dragOffset == .zero { Haptics.tap() }
                             let limited = clamp(value.translation, radius: radius)
                             dragOffset = limited
                             onChange(CGVector(dx: limited.width / radius, dy: limited.height / radius))

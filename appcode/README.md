@@ -4,7 +4,7 @@ Set where your iPhone says it is. Tap the map, search a place or type coordinate
 
 ## Features
 
-- Move to any place: tap the map, search, or paste coordinates
+- Spoof any place: tap the map, search, or paste coordinates
 - Joystick for walking, running, cycling or driving, with natural speed variation
 - Routes on real roads and footpaths (MapKit), drawn paths, and GPX import and export
 - Favourites, recents and saved routes
@@ -34,7 +34,7 @@ Trace uses the MIT-licensed [idevice](https://github.com/jkcoxson/idevice) FFI t
 
 Also install **[LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044)** (a loopback tunnel, default `10.7.0.1`).
 
-Start your first move on Wi‑Fi. After that it keeps working on cellular.
+Start your first spoof on Wi‑Fi. After that it keeps working on cellular.
 
 Some games run their own location checks and reject developer-set positions. That's expected with this method: Trace changes what the system reports and doesn't modify other apps.
 

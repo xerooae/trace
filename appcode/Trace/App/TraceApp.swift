@@ -109,6 +109,7 @@ struct AppTabs: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .tabBarMinimizeBehavior(.never)
+        .sensoryFeedback(.selection, trigger: router.tab)
         .overlay {
             SearchOverlay(isActive: $router.searching)
         }

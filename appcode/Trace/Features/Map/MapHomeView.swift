@@ -29,6 +29,7 @@ struct MapHomeView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(Prefs.showRealPosition) private var showReal = true
+    @AppStorage(Prefs.mapLook) private var mapLook: MapLook = .satellite
 
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var showRoutes = false
@@ -42,11 +43,8 @@ struct MapHomeView: View {
             Map(position: $position) {
                 mapContent
             }
-            .mapStyle(Self.traceMapStyle)
+            .mapStyle(mapStyle)
             .mapControlVisibility(.hidden)
-            // Black-and-white satellite: Trace's own look.
-            .saturation(0)
-            .contrast(1.08)
             // Global coordinates keep the tap and the conversion in the same space.
             .onTapGesture(coordinateSpace: .global) { point in
                 handleTap(point, proxy: proxy)
@@ -54,9 +52,12 @@ struct MapHomeView: View {
         }
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {
-            // Pinned above the tab bar: it doesn't ride up with the keyboard, and it
-            // steps aside while search is open.
+            // Pinned above the tab bar, and it steps aside while search is open. It
+            // fills the height so ignoring the keyboard keeps it at the bottom; a
+            // fit-to-content stack is re-centred in the bigger frame instead, which
+            // left the tray high while the keyboard went down.
             bottomStack
+                .frame(maxHeight: .infinity, alignment: .bottom)
                 .ignoresSafeArea(.keyboard, edges: .bottom)
                 .opacity(router.searching ? 0 : 1)
                 .offset(y: router.searching ? 24 : 0)
@@ -64,6 +65,8 @@ struct MapHomeView: View {
                 .accessibilityHidden(router.searching)
                 .animation(TraceTheme.motion, value: router.searching)
         }
+        // The keyboard belongs to the search field. Nothing on the map moves for it.
+        .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showRoutes) {
             RoutesSheet(
                 route: $route,
@@ -157,9 +160,17 @@ struct MapHomeView: View {
         }
     }
 
-    /// The one map style: satellite imagery with road and place labels, no business
-    /// pins, and realistic elevation, so it zooms out to the 3D globe.
-    private static let traceMapStyle: MapStyle = .hybrid(elevation: .realistic, pointsOfInterest: .excludingAll)
+    /// Both looks use realistic elevation, so they zoom out to the 3D globe.
+    private var mapStyle: MapStyle {
+        switch mapLook {
+        case .satellite:
+            // Colour satellite with road and place labels, and no business pins.
+            return .hybrid(elevation: .realistic, pointsOfInterest: .excludingAll)
+        case .standard:
+            // The standard Apple Maps view.
+            return .standard(elevation: .realistic)
+        }
+    }
 
     private var markerState: PositionState {
         switch session.status {
@@ -218,7 +229,10 @@ struct MapHomeView: View {
     @ViewBuilder private func glassButton(_ systemImage: String, label: String, selected: Bool = false,
                                           action: @escaping () -> Void) -> some View {
         if selected {
-            Button(action: action) {
+            Button {
+                Haptics.tap()
+                action()
+            } label: {
                 Image(systemName: systemImage)
                     .frame(width: 24, height: 24)
             }
@@ -229,7 +243,10 @@ struct MapHomeView: View {
             .accessibilityLabel(label)
             .accessibilityAddTraits(.isSelected)
         } else {
-            Button(action: action) {
+            Button {
+                Haptics.tap()
+                action()
+            } label: {
                 Image(systemName: systemImage)
                     .frame(width: 24, height: 24)
             }
@@ -278,14 +295,14 @@ struct MapHomeView: View {
             return Line(state: .connecting, title: session.status.label, detail: session.liveName ?? "Opening the tunnel")
         }
         if let candidate = session.candidate {
-            // The grey marker and the blue Move already say it isn't sent.
+            // The grey marker and the blue Spoof already say it isn't sent.
             return Line(state: .candidate, title: session.pinName ?? "Selected position", coordinate: candidate)
         }
         if session.isSpoofing, let live = session.simulated {
             return Line(state: .live, title: liveTitle, coordinate: live)
         }
         if !tunnelConnected {
-            return Line(state: .off, title: "LocalDevVPN isn't connected", detail: "Connect it before you move")
+            return Line(state: .off, title: "LocalDevVPN isn't connected", detail: "Connect it before you spoof")
         }
         return Line(state: .off, title: "Off", detail: "Tap the map or search")
     }
@@ -329,14 +346,14 @@ struct MapHomeView: View {
         }
         .padding(.leading, 18)
         .padding(.trailing, 8)
-        .frame(minHeight: 64)
+        .frame(height: TraceTheme.barHeight)
         .traceGlass(.regular, in: Capsule())
         .contextMenu { lineMenu }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Controls")
     }
 
-    /// One action at the thumb: blue Move, or a neutral Stop, Cancel, Connect or Done.
+    /// One action at the thumb: blue Spoof, or a neutral Stop, Cancel, Connect or Done.
     @ViewBuilder private var lineActions: some View {
         if route.drawing {
             Button {
@@ -362,7 +379,7 @@ struct MapHomeView: View {
             } else {
                 starButton(candidate, name: session.pinName)
             }
-            lineButton("Move", primary: true) { session.teleport(to: candidate, pairing: pairing) }
+            lineButton("Spoof", primary: true) { session.teleport(to: candidate, pairing: pairing) }
                 .disabled(session.isBusy)
         } else if session.isSpoofing, let live = session.simulated {
             starButton(live, name: session.liveName)
@@ -370,7 +387,7 @@ struct MapHomeView: View {
         } else if !tunnelConnected {
             lineButton("Connect", primary: false) { LocalDevVPN.openOrInstall() }
         } else {
-            lineButton("Move", primary: true) {}
+            lineButton("Spoof", primary: true) {}
                 .disabled(true)
         }
     }
@@ -381,8 +398,8 @@ struct MapHomeView: View {
             session.toggleFavorite(coordinate, name: name)
         } label: {
             Image(systemName: saved ? "star.fill" : "star")
-                .font(.body.weight(.medium))
-                .frame(width: 40, height: 44)
+                .font(.title2.weight(.medium))
+                .frame(width: 46, height: 46)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -391,10 +408,13 @@ struct MapHomeView: View {
         .sensoryFeedback(.selection, trigger: saved)
     }
 
-    /// A compact capsule inside the line: Trace Blue for Move, neutral for the rest.
+    /// A compact capsule inside the line: Trace Blue for Spoof, neutral for the rest.
     @ViewBuilder private func lineButton(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
         if primary {
-            Button(action: action) {
+            Button {
+                Haptics.press()
+                action()
+            } label: {
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(Color.white)
@@ -405,7 +425,10 @@ struct MapHomeView: View {
             .controlSize(.large)
             .tint(TraceTheme.accent)
         } else {
-            Button(action: action) {
+            Button {
+                Haptics.tap()
+                action()
+            } label: {
                 Text(title)
                     .font(.headline)
                     .padding(.horizontal, 4)
@@ -445,6 +468,7 @@ struct MapHomeView: View {
 
     private func handleTap(_ point: CGPoint, proxy: MapProxy) {
         guard let coordinate = proxy.convert(point, from: .global) else { return }
+        Haptics.tap()
         if route.drawing {
             route.drawn.append(coordinate)
             return
@@ -485,7 +509,7 @@ struct MapHomeView: View {
     private func buildRoute() {
         guard let end = route.destination ?? session.candidate else { return }
         guard let start = session.simulated ?? session.realCoordinate else {
-            session.lastError = "Trace doesn't know where to start. Allow location access, or move somewhere first."
+            session.lastError = "Trace doesn't know where to start. Allow location access, or spoof a position first."
             return
         }
         let mode = session.travelMode

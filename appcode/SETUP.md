@@ -1,4 +1,4 @@
-# Trace: install and first move
+# Trace: install and first spoof
 
 ## 1. Sideload the IPA
 
@@ -41,6 +41,6 @@ On first launch, create an account with Sign in with Apple (signed builds only) 
 
 Install [LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044) and connect it (default tunnel address `10.7.0.1`).
 
-## 5. Move
+## 5. Spoof
 
-On Wi‑Fi: tap the map or search a place, then **Move**. The joystick, routes and GPX work from there, and the session keeps going on cellular.
+On Wi‑Fi: tap the map or search a place, then **Spoof**. The joystick, routes and GPX work from there, and the session keeps going on cellular.

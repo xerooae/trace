@@ -4,7 +4,7 @@ import SwiftUI
 /// Search. The search control beside the tab bar turns into a glass field above
 /// the keyboard, which comes up straight away. Results drop down from the top in
 /// Liquid Glass, like the Dynamic Island expanding. Choosing a result places it
-/// on the map, ready for Move here.
+/// on the map, ready for Spoof.
 struct SearchOverlay: View {
     @Binding var isActive: Bool
 
@@ -48,13 +48,13 @@ struct SearchOverlay: View {
             }
             VStack(spacing: 10) {
                 if isActive {
-                    // Results follow the field: they drop from the top 120 ms later,
-                    // always at full size, whatever the number of results.
+                    // Results drop from the top in step with the keyboard, always at
+                    // full size, whatever the number of results.
                     resultsPanel(sections)
                         .frame(maxHeight: .infinity)
                         .transition(.asymmetric(
-                            insertion: .scale(scale: 0.2, anchor: .top).combined(with: .opacity)
-                                .animation(morph.delay(0.12)),
+                            insertion: .scale(scale: 0.85, anchor: .top).combined(with: .opacity)
+                                .animation(.spring(duration: 0.3, bounce: 0.08)),
                             removal: .scale(scale: 0.2, anchor: .top).combined(with: .opacity)
                         ))
                 } else {
@@ -66,6 +66,7 @@ struct SearchOverlay: View {
         .animation(morph, value: isActive)
         .animation(morph, value: sections.map { "\($0.id)\($0.rows.count)" }.joined())
         .onChange(of: isActive) { _, active in
+            if active { Haptics.tap() }
             focused = active
             // Focus again once the field has its full width.
             if active { DispatchQueue.main.async { focused = true } }
@@ -310,6 +311,7 @@ struct SearchOverlay: View {
     /// Places the result on the map as the candidate and switches to the Map tab.
     /// Typed coordinates have no name, so Trace looks one up.
     private func choose(_ coordinate: CLLocationCoordinate2D, name: String?) {
+        Haptics.select()
         session.placeCandidate(coordinate, name: name)
         if name == nil { session.nameCandidate(coordinate) }
         router.cameraTarget = SavedPlace(name: name ?? Coord.format(coordinate), coordinate: coordinate)

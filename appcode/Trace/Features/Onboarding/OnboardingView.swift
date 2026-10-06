@@ -308,7 +308,7 @@ struct PlanView: View {
                    : "Renew to keep moving. Your places, routes and settings are kept and come back as they were.") {
             if mode == .choose {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(["Move anywhere, system-wide", "Routes, joystick and GPX", "Places synced across devices"], id: \.self) { line in
+                    ForEach(["Spoof anywhere, system-wide", "Routes, joystick and GPX", "Places synced across devices"], id: \.self) { line in
                         HStack(spacing: 12) {
                             BearingShape().fill(TraceTheme.ink2).frame(width: 9, height: 12)
                             Text(line).foregroundStyle(TraceTheme.ink)
@@ -473,7 +473,7 @@ struct TunnelStep: View {
     var body: some View {
         StepLayout(connected ? "Connected" : "Connect LocalDevVPN",
                    message: connected
-                   ? "Start your first move on Wi‑Fi. After that it keeps working on cellular."
+                   ? "Start your first spoof on Wi‑Fi. After that it keeps working on cellular."
                    : "LocalDevVPN opens a private tunnel on this iPhone. Trace uses it to reach the location service.") {
             HStack(spacing: 14) {
                 Image(systemName: "lock.shield")

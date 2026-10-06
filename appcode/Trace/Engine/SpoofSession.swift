@@ -442,7 +442,7 @@ final class SpoofSession: ObservableObject {
         }
     }
 
-    /// Heading and trail for the live marker. A jump (Move here) resets both;
+    /// Heading and trail for the live marker. A jump (Spoof) resets both;
     /// the marker points north when still.
     private func track(from previous: CLLocationCoordinate2D?, to next: CLLocationCoordinate2D, jumped: Bool) {
         guard !jumped, let previous else {

@@ -28,10 +28,23 @@ enum TraceTheme {
     static let trayRadius: CGFloat = 28
     static let trayPadding: CGFloat = 12
     static let rowGap: CGFloat = 10
+    /// The iOS 26 tab bar's height. The tray matches it so the two read as a pair.
+    static let barHeight: CGFloat = 62
 
     /// Precise, not bouncy.
     static let motion = Animation.spring(duration: 0.35, bounce: 0)
     static let camera = Animation.easeInOut(duration: 0.6)
+}
+
+// MARK: - Haptics
+
+/// Haptics for taps the system doesn't already cover: a light tap for buttons, a
+/// firmer press for the blue action, a selection tick for choices.
+@MainActor
+enum Haptics {
+    static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+    static func press() { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+    static func select() { UISelectionFeedbackGenerator().selectionChanged() }
 }
 
 // MARK: - Glass
@@ -88,7 +101,10 @@ struct PrimaryButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            Haptics.press()
+            action()
+        } label: {
             Text(title)
                 .font(.headline)
                 .foregroundStyle(isEnabled ? Color.white : TraceTheme.ink3)
@@ -118,7 +134,10 @@ struct SecondaryButton<Label: View>: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
             label
                 .font(.headline)
                 .lineLimit(1)

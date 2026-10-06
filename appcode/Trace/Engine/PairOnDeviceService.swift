@@ -126,7 +126,7 @@ final class PairOnDeviceService: ObservableObject {
         teardown()
         Self.postPlainNotification(
             title: "Trace paired",
-            body: "This iPhone is paired. Connect LocalDevVPN, then move."
+            body: "This iPhone is paired. Connect LocalDevVPN, then spoof."
         )
     }
 
