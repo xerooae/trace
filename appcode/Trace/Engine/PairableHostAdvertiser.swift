@@ -51,11 +51,11 @@ final class PairableHostAdvertiser {
                 case .ready:
                     let p = listener.port?.rawValue ?? 0
                     self?.publishedPort = p
-                    NSLog("[Locus] NWListener ready on port %u (relay → 127.0.0.1:%u)", p, port)
+                    NSLog("[Trace] NWListener ready on port %u (relay → 127.0.0.1:%u)", p, port)
                 case .failed(let error):
-                    NSLog("[Locus] NWListener failed: %@", String(describing: error))
+                    NSLog("[Trace] NWListener failed: %@", String(describing: error))
                 case .cancelled:
-                    NSLog("[Locus] NWListener cancelled")
+                    NSLog("[Trace] NWListener cancelled")
                 default:
                     break
                 }
@@ -63,7 +63,7 @@ final class PairableHostAdvertiser {
 
             listener.newConnectionHandler = { [weak self] connection in
                 NSLog(
-                    "[Locus] NWListener accepted %@",
+                    "[Trace] NWListener accepted %@",
                     String(describing: connection.endpoint)
                 )
                 self?.relay(connection)
@@ -71,9 +71,9 @@ final class PairableHostAdvertiser {
 
             listener.start(queue: .global(qos: .userInitiated))
             self.listener = listener
-            NSLog("[Locus] NWListener starting; will relay → 127.0.0.1:%u", port)
+            NSLog("[Trace] NWListener starting; will relay → 127.0.0.1:%u", port)
         } catch {
-            NSLog("[Locus] NWListener start failed: %@", error.localizedDescription)
+            NSLog("[Trace] NWListener start failed: %@", error.localizedDescription)
         }
     }
 
@@ -107,7 +107,7 @@ final class PairableHostAdvertiser {
 private final class RelayPipe {
     private let inbound: NWConnection
     private let outbound: NWConnection
-    private let queue = DispatchQueue(label: "locus.pairable.relay")
+    private let queue = DispatchQueue(label: "trace.pairable.relay")
 
     init(inbound: NWConnection, outbound: NWConnection) {
         self.inbound = inbound
@@ -123,11 +123,11 @@ private final class RelayPipe {
             guard let self else { return }
             switch state {
             case .ready:
-                NSLog("[Locus] relay connected to Rust loopback")
+                NSLog("[Trace] relay connected to Rust loopback")
                 self.pump(from: self.inbound, to: self.outbound)
                 self.pump(from: self.outbound, to: self.inbound)
             case .failed(let error):
-                NSLog("[Locus] relay to Rust failed: %@", String(describing: error))
+                NSLog("[Trace] relay to Rust failed: %@", String(describing: error))
                 self.cancel()
             case .cancelled:
                 self.cancel()
@@ -148,14 +148,14 @@ private final class RelayPipe {
         from.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
             guard let self else { return }
             if let error {
-                NSLog("[Locus] relay receive error: %@", String(describing: error))
+                NSLog("[Trace] relay receive error: %@", String(describing: error))
                 self.cancel()
                 return
             }
             if let data, !data.isEmpty {
                 to.send(content: data, completion: .contentProcessed { sendError in
                     if let sendError {
-                        NSLog("[Locus] relay send error: %@", String(describing: sendError))
+                        NSLog("[Trace] relay send error: %@", String(describing: sendError))
                         self.cancel()
                         return
                     }

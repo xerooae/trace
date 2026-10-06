@@ -90,14 +90,12 @@ struct SavedRoute: Identifiable, Codable, Equatable {
     }
 }
 
-/// UserDefaults keys for settings. The `locus.` keys predate the rename and are kept
-/// so existing installs keep their data.
+/// UserDefaults keys for settings.
 enum Prefs {
-    static let setupComplete = "locus.setupComplete"
+    static let setupComplete = "trace.setupComplete"
     static let speedVariation = "trace.speedVariation"
     static let interruptionAlerts = "trace.interruptionAlerts"
     static let showRealPosition = "trace.showRealPosition"
-    static let mapStyle = "trace.mapStyle"
 
     static func bool(_ key: String, default value: Bool = true) -> Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? value

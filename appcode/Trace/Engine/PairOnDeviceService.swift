@@ -62,7 +62,7 @@ final class PairOnDeviceService: ObservableObject {
                 Self.runBlockingAccept(outputPath: outputPath, box: box)
             }
         }
-        worker?.name = "locus.pairable-host"
+        worker?.name = "trace.pairable-host"
         worker?.qualityOfService = .userInitiated
         worker?.start()
     }
@@ -102,7 +102,7 @@ final class PairOnDeviceService: ObservableObject {
             minVer: minVer
         )
         phase = .advertising
-        NSLog("[Locus] listening on %u, Bonjour id=%@", port, serviceIdentifier)
+        NSLog("[Trace] listening on %u, Bonjour id=%@", port, serviceIdentifier)
     }
 
     fileprivate func handleConnected() {
@@ -146,7 +146,7 @@ final class PairOnDeviceService: ObservableObject {
         keepAlive.start()
         audioKeepAlive.start()
         guard backgroundTask == .invalid else { return }
-        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "locus.pairable-host") { [weak self] in
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "trace.pairable-host") { [weak self] in
             self?.endKeepAlive()
         }
     }
@@ -172,7 +172,7 @@ final class PairOnDeviceService: ObservableObject {
         if #available(iOS 15.0, *) {
             content.interruptionLevel = .timeSensitive
         }
-        let request = UNNotificationRequest(identifier: "locus.pairing.pin", content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: "trace.pairing.pin", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 
@@ -181,7 +181,7 @@ final class PairOnDeviceService: ObservableObject {
         content.title = title
         content.body = body
         content.sound = .default
-        let request = UNNotificationRequest(identifier: "locus.pairing.status.\(UUID().uuidString)", content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: "trace.pairing.status.\(UUID().uuidString)", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 

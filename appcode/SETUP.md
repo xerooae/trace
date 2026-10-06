@@ -1,42 +1,46 @@
-# Locus — install & first teleport
+# Trace: install and first move
 
 ## 1. Sideload the IPA
 
-Install the latest IPA from [Releases](https://github.com/ChrisMack32/Locus/releases) (or build from source) with Feather, SideStore, AltStore, Sideloadly, or LiveContainer.
+Install the latest IPA from [Releases](https://github.com/xerooae/trace/releases/latest) (or build from source) with LiveContainer, Feather, SideStore, AltStore or Sideloadly.
 
-Bundle ID: `com.chrismack.locus`
+Bundle ID: `com.xerooae.trace`
 
 ### LiveContainer
 
-File pickers often break inside LiveContainer. Do one of the following:
+File pickers often break inside LiveContainer. Do one of these:
 
-1. Long-press **Locus** in LiveContainer → **Settings** → enable **Fix File Picker**, then try Import again.
-2. Share / open the pairing file **into LiveContainer → Locus** (iOS share sheet).
-3. Copy the RPPairing plist contents, open Locus → **Paste RPPairing from clipboard** (setup or Settings).
+1. Long-press **Trace** in LiveContainer → **Settings** → enable **Fix File Picker**, then try Import again.
+2. Share or open the pairing file **into LiveContainer → Trace** (iOS share sheet).
+3. Copy the RPPairing file's contents, open Trace → **Paste from clipboard** (first run or Settings › Pairing).
 
-## 2. Pairing
+## 2. Account
 
-### On iOS 27 — no computer
+On first launch, create an account with Sign in with Apple (signed builds only) or your email. For now the account lives on this iPhone and every account has full access.
 
-1. Open Locus → **Settings → Pair on this iPhone** → **Start pairing**.
-2. Allow **Local Network** (and Location / Notifications if asked).
-3. Leave Locus open. Go to **Settings › Privacy & Security › Developer Mode › Pair with Host**.
-4. Pick **Locus** → **Pair**.
-5. Enter your **iPhone unlock passcode** first (authorizes pairing).
-6. When the second prompt appears, type the **6-digit code** Locus shows (also sent as a notification).
-7. Done — RPPairing file is saved on-device.
+## 3. Pairing
 
-### On iOS 18–26
+### On iOS 27, no computer
+
+1. In first run, or Settings › Pairing › **Pair on this iPhone**, tap **Start pairing**.
+2. Allow **Local Network** (and Location and Notifications if asked).
+3. Leave Trace running. Go to **Settings › Privacy & Security › Developer Mode › Pair with Host**.
+4. Pick **Trace** → **Pair**.
+5. Enter your **iPhone passcode** first.
+6. At the second prompt, type the **six-digit code** Trace shows (it's also sent as a notification).
+7. Done: the pairing is saved on this iPhone.
+
+### On iOS 26
 
 1. On a computer, download [idevice_pair](https://github.com/jkcoxson/idevice_pair/releases).
-2. Plug in your iPhone, unlock, Trust.
-3. Generate an **RPPairing** file (not lockdown / SideStore `.mobiledevicepairing`).
-4. AirDrop / Share → Open in **Locus**, **Import**, or **Paste from clipboard**.
+2. Plug in your iPhone, unlock it and tap Trust.
+3. Make an **RPPairing** file (not a lockdown or SideStore `.mobiledevicepairing` file).
+4. AirDrop or share it to Trace, then **Import**, or **Paste from clipboard**.
 
-## 3. LocalDevVPN
+## 4. LocalDevVPN
 
-Install [LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044), connect it (default tunnel IP `10.7.0.1`).
+Install [LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044) and connect it (default tunnel address `10.7.0.1`).
 
-## 4. Teleport
+## 5. Move
 
-On Wi‑Fi: drop a pin → **Teleport**. Then joystick / routes / GPX work; the session can continue on cellular.
+On Wi‑Fi: tap the map or search a place, then **Move**. The joystick, routes and GPX work from there, and the session keeps going on cellular.

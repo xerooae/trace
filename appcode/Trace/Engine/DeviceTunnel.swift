@@ -3,7 +3,7 @@ import Foundation
 enum TunnelConfig {
     /// LocalDevVPN / SideStore-style loopback tunnel endpoint.
     static let defaultIP = "10.7.0.1"
-    static let defaultsKey = "locus.targetDeviceIP"
+    static let defaultsKey = "trace.targetDeviceIP"
 
     static var targetIP: String {
         let stored = UserDefaults.standard.string(forKey: defaultsKey)?

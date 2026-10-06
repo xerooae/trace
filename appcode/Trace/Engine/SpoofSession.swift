@@ -86,9 +86,6 @@ final class SpoofSession: ObservableObject {
     /// The device's own position, captured while nothing is live.
     @Published private(set) var realLocation: CLLocationCoordinate2D?
     @Published var travelMode: TravelMode = .walk
-    @Published var mapStyleIndex: Int = UserDefaults.standard.integer(forKey: Prefs.mapStyle) {
-        didSet { UserDefaults.standard.set(mapStyleIndex, forKey: Prefs.mapStyle) }
-    }
     @Published var lastError: String?
     @Published var isBusy = false
     @Published var joystickActive = false
@@ -105,8 +102,8 @@ final class SpoofSession: ObservableObject {
     private var joystickVector: CGVector = .zero
     private let locationKeeper = BackgroundKeepAlive()
 
-    private let favoritesKey = "locus.favorites"
-    private let recentsKey = "locus.recents"
+    private let favoritesKey = "trace.favorites"
+    private let recentsKey = "trace.recents"
     private let routesKey = "trace.routes"
 
     init() {

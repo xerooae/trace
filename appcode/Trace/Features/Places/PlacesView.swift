@@ -1,16 +1,17 @@
 import SwiftUI
 
-/// Everything saved, in one tab: a native grouped list, with the switch in the
-/// bottom toolbar where the thumb is. Search lives in the search tab.
+/// Everything saved, in one native list: Favourites, Recents and Routes as
+/// sections, like the Settings app. Long sections show a few rows and expand in
+/// place with "Show all". Search lives in the search control.
 struct PlacesView: View {
-    enum Scope: String, CaseIterable, Hashable {
+    enum Kind: Hashable {
         case favourites, recents, routes
 
-        var title: String {
+        /// Rows shown before "Show all".
+        var limit: Int {
             switch self {
-            case .favourites: return "Favourites"
-            case .recents: return "Recents"
-            case .routes: return "Routes"
+            case .favourites: return 5
+            case .recents, .routes: return 3
             }
         }
     }
@@ -19,7 +20,7 @@ struct PlacesView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var accounts: AccountStore
 
-    @State private var scope: Scope = .favourites
+    @State private var expanded: Set<Kind> = []
     @State private var selected: SavedPlace?
     @State private var renamingPlace: SavedPlace?
     @State private var renamingRoute: SavedRoute?
@@ -28,84 +29,96 @@ struct PlacesView: View {
     var body: some View {
         NavigationStack {
             List {
+                if !session.favorites.isEmpty {
+                    Section {
+                        ForEach(visible(session.favorites, .favourites)) { place in
+                            placeRow(place, systemImage: "star.fill", detail: Coord.format(place.coordinate), mono: true)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        session.removeFavorite(place)
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                    Button {
+                                        startRename(place)
+                                    } label: {
+                                        Label("Rename", systemImage: "pencil")
+                                    }
+                                }
+                        }
+                    } header: {
+                        sectionHeader("Favourites", kind: .favourites, count: session.favorites.count)
+                    }
+                }
+
+                if !session.recents.isEmpty {
+                    Section {
+                        ForEach(visible(session.recents, .recents)) { place in
+                            placeRow(place, systemImage: "clock", detail: recentDetail(place), mono: place.date == nil)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        session.removeRecent(place)
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                    Button {
+                                        session.addFavorite(name: place.name, coordinate: place.coordinate)
+                                    } label: {
+                                        Label("Favourite", systemImage: "star")
+                                    }
+                                }
+                        }
+                    } header: {
+                        sectionHeader("Recents", kind: .recents, count: session.recents.count)
+                    }
+                }
+
+                if !session.savedRoutes.isEmpty {
+                    Section {
+                        ForEach(visible(session.savedRoutes, .routes)) { saved in
+                            routeRow(saved)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        session.removeRoute(saved)
+                                    } label: {
+                                        Label("Remove", systemImage: "trash")
+                                    }
+                                    Button {
+                                        newName = saved.name
+                                        renamingRoute = saved
+                                    } label: {
+                                        Label("Rename", systemImage: "pencil")
+                                    }
+                                }
+                        }
+                    } header: {
+                        sectionHeader("Routes", kind: .routes, count: session.savedRoutes.count)
+                    }
+                }
+
                 if !isEmpty {
                     Section {
-                        switch scope {
-                        case .favourites:
-                            ForEach(session.favorites) { place in
-                                placeRow(place, systemImage: "star.fill", detail: Coord.format(place.coordinate), mono: true)
-                                    .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) {
-                                            session.removeFavorite(place)
-                                        } label: {
-                                            Label("Remove", systemImage: "trash")
-                                        }
-                                        Button {
-                                            startRename(place)
-                                        } label: {
-                                            Label("Rename", systemImage: "pencil")
-                                        }
-                                    }
-                            }
-                        case .recents:
-                            ForEach(session.recents) { place in
-                                placeRow(place, systemImage: "clock", detail: recentDetail(place), mono: place.date == nil)
-                                    .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) {
-                                            session.removeRecent(place)
-                                        } label: {
-                                            Label("Remove", systemImage: "trash")
-                                        }
-                                        Button {
-                                            session.addFavorite(name: place.name, coordinate: place.coordinate)
-                                        } label: {
-                                            Label("Favourite", systemImage: "star")
-                                        }
-                                    }
-                            }
-                        case .routes:
-                            ForEach(session.savedRoutes) { saved in
-                                routeRow(saved)
-                                    .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) {
-                                            session.removeRoute(saved)
-                                        } label: {
-                                            Label("Remove", systemImage: "trash")
-                                        }
-                                        Button {
-                                            newName = saved.name
-                                            renamingRoute = saved
-                                        } label: {
-                                            Label("Rename", systemImage: "pencil")
-                                        }
-                                    }
-                            }
-                        }
                     } footer: {
-                        Text(syncLine)
+                        Text(accounts.syncEnabled ? "Sync is on." : "Saved on this iPhone.")
                     }
                 }
             }
             .navigationTitle("Places")
+            // Less space above the content: the large title sits in the bar, and the
+            // list starts right under it with compact section gaps.
+            .toolbarTitleDisplayMode(.inlineLarge)
+            .contentMargins(.top, 8, for: .scrollContent)
+            .listSectionSpacing(.compact)
+            .animation(TraceTheme.motion, value: expanded)
             .overlay {
-                if isEmpty { emptyState }
-            }
-            // Above the tab bar, not in a bottom toolbar: inside a TabView on iOS 26
-            // a bottom toolbar renders behind the tab bar.
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Picker("Show", selection: $scope) {
-                    ForEach(Scope.allCases, id: \.self) { scope in
-                        Text(scope.title).tag(scope)
-                    }
+                if isEmpty {
+                    ContentUnavailableView(
+                        "No places yet",
+                        systemImage: "star",
+                        description: Text("Tap the star on any place to keep it here. Places you move to, and routes you save, appear here too.")
+                    )
                 }
-                .pickerStyle(.segmented)
-                .padding(4)
-                .glassEffect(.regular, in: Capsule())
-                .frame(maxWidth: 420)
-                .padding(.horizontal, TraceTheme.gutter)
-                .padding(.bottom, 8)
             }
-            .sensoryFeedback(.selection, trigger: scope)
             .sheet(item: $selected) { place in
                 PlaceSheet(place: place, onRename: { startRename(place) })
                     .presentationDetents([.medium, .large])
@@ -137,6 +150,36 @@ struct PlacesView: View {
         }
     }
 
+    // MARK: - Sections
+
+    /// A prominent section title with "Show all" / "Show less" when the section is long.
+    private func sectionHeader(_ title: String, kind: Kind, count: Int) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(TraceTheme.ink)
+            Spacer()
+            if count > kind.limit {
+                Button(expanded.contains(kind) ? "Show less" : "Show all") {
+                    if expanded.contains(kind) {
+                        expanded.remove(kind)
+                    } else {
+                        expanded.insert(kind)
+                    }
+                }
+                .font(.subheadline)
+                .tint(TraceTheme.accent)
+                .buttonStyle(.borderless)
+            }
+        }
+        .textCase(nil)
+        .padding(.horizontal, -4)
+    }
+
+    private func visible<T>(_ items: [T], _ kind: Kind) -> [T] {
+        expanded.contains(kind) ? items : Array(items.prefix(kind.limit))
+    }
+
     // MARK: - Rows
 
     private func placeRow(_ place: SavedPlace, systemImage: String, detail: String, mono: Bool) -> some View {
@@ -155,7 +198,7 @@ struct PlacesView: View {
                 }
             } icon: {
                 Image(systemName: systemImage)
-                    .foregroundStyle(TraceTheme.ink2)
+                    .foregroundStyle(TraceTheme.ink)
             }
         }
     }
@@ -176,22 +219,12 @@ struct PlacesView: View {
                 }
             } icon: {
                 Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-                    .foregroundStyle(TraceTheme.ink2)
+                    .foregroundStyle(TraceTheme.ink)
             }
         }
     }
 
     // MARK: - Data
-
-    private var syncLine: String {
-        let count: String
-        switch scope {
-        case .favourites: count = "\(session.favorites.count) \(session.favorites.count == 1 ? "favourite" : "favourites")"
-        case .recents: count = "Your last \(session.recents.count) moves"
-        case .routes: count = "\(session.savedRoutes.count) \(session.savedRoutes.count == 1 ? "route" : "routes")"
-        }
-        return accounts.syncEnabled ? "\(count). Sync is on." : "\(count), on this iPhone."
-    }
 
     private func recentDetail(_ place: SavedPlace) -> String {
         guard let date = place.date else { return Coord.format(place.coordinate) }
@@ -199,25 +232,7 @@ struct PlacesView: View {
     }
 
     private var isEmpty: Bool {
-        switch scope {
-        case .favourites: return session.favorites.isEmpty
-        case .recents: return session.recents.isEmpty
-        case .routes: return session.savedRoutes.isEmpty
-        }
-    }
-
-    @ViewBuilder private var emptyState: some View {
-        switch scope {
-        case .favourites:
-            ContentUnavailableView("No favourites yet", systemImage: "star",
-                                   description: Text("Tap the star on any place to keep it here."))
-        case .recents:
-            ContentUnavailableView("No moves yet", systemImage: "clock",
-                                   description: Text("Places you move to appear here."))
-        case .routes:
-            ContentUnavailableView("No saved routes", systemImage: "point.topleft.down.to.point.bottomright.curvepath",
-                                   description: Text("Build or draw a route on the map, then save it."))
-        }
+        session.favorites.isEmpty && session.recents.isEmpty && session.savedRoutes.isEmpty
     }
 
     private func startRename(_ place: SavedPlace) {
@@ -235,7 +250,7 @@ struct PlacesView: View {
 }
 
 /// A place opens at the medium detent as a native list, with Move here pinned at
-/// the bottom as the one white action.
+/// the bottom as the one blue action.
 struct PlaceSheet: View {
     let place: SavedPlace
     var onRename: () -> Void

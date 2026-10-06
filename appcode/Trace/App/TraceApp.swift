@@ -63,6 +63,8 @@ final class AppRouter: ObservableObject {
     @Published var routeDestination: SavedPlace?
     /// The map loads this saved route into Routes, then clears it.
     @Published var routeToLoad: SavedRoute?
+    /// Search is open. The map hides its floating buttons and tray meanwhile.
+    @Published var searching = false
 }
 
 /// Three tabs: Map · Places · Settings, plus search as its own control beside the
@@ -70,7 +72,6 @@ final class AppRouter: ObservableObject {
 struct AppTabs: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var session: SpoofSession
-    @State private var searching = false
 
     /// The search control never becomes the selected tab, so the tab bar never
     /// collapses (and never changes height). It turns into the search overlay.
@@ -79,7 +80,7 @@ struct AppTabs: View {
             get: { router.tab },
             set: { tab in
                 if tab == .search {
-                    searching = true
+                    router.searching = true
                     // Re-publish the current tab so the tab bar snaps back to it.
                     let current = router.tab
                     router.tab = current
@@ -109,7 +110,7 @@ struct AppTabs: View {
         .tabViewStyle(.sidebarAdaptable)
         .tabBarMinimizeBehavior(.never)
         .overlay {
-            SearchOverlay(isActive: $searching)
+            SearchOverlay(isActive: $router.searching)
         }
         .sensoryFeedback(trigger: session.status) { old, new in
             if new == .active && old != .active { return .success }

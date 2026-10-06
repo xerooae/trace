@@ -6,8 +6,8 @@ enum LocalDevVPN {
     static let appStoreURL = URL(string: "https://apps.apple.com/us/app/localdevvpn/id6755608044")!
     static let detectURL = URL(string: "localdevvpn://")!
 
-    /// Starts the tunnel, then returns to Trace via `locus://` (the scheme predates the rename).
-    static let enableURL = URL(string: "localdevvpn://enable?scheme=locus")!
+    /// Starts the tunnel, then returns to Trace via `trace://`.
+    static let enableURL = URL(string: "localdevvpn://enable?scheme=trace")!
 
     static var isInstalled: Bool {
         UIApplication.shared.canOpenURL(detectURL)

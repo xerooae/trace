@@ -40,7 +40,7 @@ enum LocationEngineError: LocalizedError {
 
 /// Thin Swift wrapper around idevice’s DVT location simulation (injects into locationd).
 enum LocationEngine {
-    private static let queue = DispatchQueue(label: "com.chrismack.locus.location", qos: .userInitiated)
+    private static let queue = DispatchQueue(label: "com.xerooae.trace.location", qos: .userInitiated)
 
     private static var adapter: OpaquePointer?
     private static var handshake: OpaquePointer?
@@ -124,7 +124,7 @@ enum LocationEngine {
                 tunnel_create_rppairing(
                     $0,
                     socklen_t(MemoryLayout<sockaddr_in>.stride),
-                    "LocusLocation",
+                    "TraceLocation",
                     pairingHandle,
                     nil,
                     nil,

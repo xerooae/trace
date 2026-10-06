@@ -42,8 +42,11 @@ struct MapHomeView: View {
             Map(position: $position) {
                 mapContent
             }
-            .mapStyle(mapStyle)
+            .mapStyle(Self.traceMapStyle)
             .mapControlVisibility(.hidden)
+            // Black-and-white satellite: Trace's own look.
+            .saturation(0)
+            .contrast(1.08)
             // Global coordinates keep the tap and the conversion in the same space.
             .onTapGesture(coordinateSpace: .global) { point in
                 handleTap(point, proxy: proxy)
@@ -51,7 +54,15 @@ struct MapHomeView: View {
         }
         .ignoresSafeArea()
         .overlay(alignment: .bottom) {
+            // Pinned above the tab bar: it doesn't ride up with the keyboard, and it
+            // steps aside while search is open.
             bottomStack
+                .ignoresSafeArea(.keyboard, edges: .bottom)
+                .opacity(router.searching ? 0 : 1)
+                .offset(y: router.searching ? 24 : 0)
+                .allowsHitTesting(!router.searching)
+                .accessibilityHidden(router.searching)
+                .animation(TraceTheme.motion, value: router.searching)
         }
         .sheet(isPresented: $showRoutes) {
             RoutesSheet(
@@ -146,12 +157,9 @@ struct MapHomeView: View {
         }
     }
 
-    private var mapStyle: MapStyle {
-        if session.mapStyleIndex == 1 {
-            return .hybrid(elevation: .realistic)
-        }
-        return .standard(elevation: .realistic, emphasis: .muted)
-    }
+    /// The one map style: satellite imagery with road and place labels, no business
+    /// pins, and realistic elevation, so it zooms out to the 3D globe.
+    private static let traceMapStyle: MapStyle = .hybrid(elevation: .realistic, pointsOfInterest: .excludingAll)
 
     private var markerState: PositionState {
         switch session.status {
@@ -201,14 +209,7 @@ struct MapHomeView: View {
                 JoystickPad { session.updateJoystick(vector: $0) }
                     .transition(.scale(scale: 0.9).combined(with: .opacity))
             } else {
-                GlassEffectContainer(spacing: 8) {
-                    HStack(spacing: 8) {
-                        glassButton("square.3.layers.3d",
-                                    label: session.mapStyleIndex == 1 ? "Map style: satellite" : "Map style: muted",
-                                    action: cycleMapStyle)
-                        glassButton("location", label: "Show my position", action: showMyPosition)
-                    }
-                }
+                glassButton("location", label: "Show my position", action: showMyPosition)
             }
         }
     }
@@ -465,10 +466,6 @@ struct MapHomeView: View {
         } else {
             withAnimation(TraceTheme.camera) { position = .userLocation(fallback: .automatic) }
         }
-    }
-
-    private func cycleMapStyle() {
-        session.mapStyleIndex = session.mapStyleIndex == 1 ? 0 : 1
     }
 
     private func toggleJoystick() {

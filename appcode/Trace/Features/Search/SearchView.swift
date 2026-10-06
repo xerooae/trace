@@ -12,7 +12,6 @@ struct SearchOverlay: View {
     @EnvironmentObject private var router: AppRouter
     @StateObject private var completer = PlaceSearchCompleter()
     @State private var query = ""
-    @State private var resultsHeight: CGFloat = 0
     @FocusState private var focused: Bool
 
     private let morph = Animation.spring(duration: 0.38, bounce: 0.12)
@@ -47,17 +46,20 @@ struct SearchOverlay: View {
                     .onTapGesture(perform: close)
                     .transition(.opacity)
             }
-            VStack(spacing: 0) {
-                if isActive && (!sections.isEmpty || !trimmedQuery.isEmpty) {
-                    // Results follow the field: they drop from the top 120 ms later.
+            VStack(spacing: 10) {
+                if isActive {
+                    // Results follow the field: they drop from the top 120 ms later,
+                    // always at full size, whatever the number of results.
                     resultsPanel(sections)
+                        .frame(maxHeight: .infinity)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.2, anchor: .top).combined(with: .opacity)
                                 .animation(morph.delay(0.12)),
                             removal: .scale(scale: 0.2, anchor: .top).combined(with: .opacity)
                         ))
+                } else {
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
                 bottomField
             }
         }
@@ -80,11 +82,11 @@ struct SearchOverlay: View {
     // MARK: - Field (the search control, grown into a bar)
 
     private var bottomField: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 10) {
+        HStack(spacing: 8) {
+            HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(TraceTheme.ink)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(TraceTheme.ink2)
                 TextField("Places or coordinates", text: $query)
                     .focused($focused)
                     .submitLabel(.search)
@@ -102,20 +104,21 @@ struct SearchOverlay: View {
                     .accessibilityLabel("Clear search")
                 }
             }
-            .padding(.horizontal, 18)
-            .frame(width: isActive ? nil : 56, height: 56)
-            .frame(maxWidth: isActive ? .infinity : 56)
+            .padding(.horizontal, 14)
+            .frame(width: isActive ? nil : 44, height: 44)
+            .frame(maxWidth: isActive ? .infinity : 44)
             .glassEffect(.regular.interactive(), in: Capsule())
 
             if isActive {
                 Button(action: close) {
                     Image(systemName: "xmark")
-                        .frame(width: 24, height: 24)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(TraceTheme.ink)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
                 }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-                .tint(.white)
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
                 .accessibilityLabel("Close search")
                 .transition(.scale(scale: 0.5).combined(with: .opacity))
             }
@@ -135,11 +138,23 @@ struct SearchOverlay: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if sections.isEmpty {
-                    Text("No results for “\(trimmedQuery)”")
-                        .font(.subheadline)
-                        .foregroundStyle(TraceTheme.ink2)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 22)
+                    VStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.title2.weight(.medium))
+                            .foregroundStyle(TraceTheme.ink3)
+                        Text(trimmedQuery.isEmpty ? "Search for a place" : "No results for “\(trimmedQuery)”")
+                            .font(.headline)
+                            .foregroundStyle(TraceTheme.ink)
+                        Text(trimmedQuery.isEmpty
+                             ? "Type an address or a landmark, or paste coordinates like 47.1456, 27.6069."
+                             : "Check the spelling, or try coordinates.")
+                            .font(.subheadline)
+                            .foregroundStyle(TraceTheme.ink2)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 48)
                 }
                 ForEach(sections) { section in
                     Text(section.title)
@@ -159,15 +174,10 @@ struct SearchOverlay: View {
                 }
             }
             .padding(.bottom, 8)
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.height
-            } action: { height in
-                resultsHeight = height
-            }
         }
-        .scrollBounceBehavior(.basedOnSize)
+        .scrollIndicators(.automatic)
         .scrollDismissesKeyboard(.never)
-        .frame(height: min(max(resultsHeight, 64), 400))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .clipShape(panelShape)
         .glassEffect(.regular, in: panelShape)
         .padding(.horizontal, 10)
@@ -208,13 +218,13 @@ struct SearchOverlay: View {
         let q = trimmedQuery
         var result: [ResultSection] = []
         if q.isEmpty {
-            let favourites = session.favorites.prefix(4).map { savedRow($0, systemImage: "star.fill") }
+            let favourites = session.favorites.prefix(8).map { savedRow($0, systemImage: "star.fill") }
             if !favourites.isEmpty {
                 result.append(ResultSection(id: "favourites", title: "Favourites", rows: Array(favourites)))
             }
             let recents = session.recents
                 .filter { recent in !session.favorites.contains { $0.id == recent.id } }
-                .prefix(4)
+                .prefix(8)
                 .map { savedRow($0, systemImage: "clock") }
             if !recents.isEmpty {
                 result.append(ResultSection(id: "recents", title: "Recents", rows: Array(recents)))
@@ -237,7 +247,7 @@ struct SearchOverlay: View {
         if !saved.isEmpty {
             result.append(ResultSection(id: "saved", title: "Saved", rows: saved))
         }
-        let places = completer.results.prefix(6).map { completion in
+        let places = completer.results.map { completion in
             Row(
                 id: "place-\(completion.title)-\(completion.subtitle)",
                 title: completion.title,
@@ -248,7 +258,7 @@ struct SearchOverlay: View {
             )
         }
         if !places.isEmpty {
-            result.append(ResultSection(id: "places", title: "Places", rows: Array(places)))
+            result.append(ResultSection(id: "results", title: "Results", rows: places))
         }
         return result
     }

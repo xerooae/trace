@@ -1,82 +1,66 @@
-# Locus
+# Trace
 
-Free and open-source iPhone location teleport. Tap the map, search a place, or drive a route — Locus injects coordinates through Apple’s **developer location service** into `locationd`, so Maps and other apps see the spoofed GPS (not just a Wi‑Fi lookup that outdoor GPS will overwrite).
-
-<p align="center">
-  <img src="docs/screenshots/map.png" alt="Locus map with spoof pin" width="180" />
-  <img src="docs/screenshots/spoofing.png" alt="Locus spoofing in 3D" width="180" />
-  <img src="docs/screenshots/joystick.png" alt="Locus joystick controls" width="180" />
-  <img src="docs/screenshots/route.png" alt="Locus route on map" width="180" />
-</p>
+Set where your iPhone says it is. Tap the map, search a place or type coordinates, or follow a route. Trace sets the position through Apple's **developer location service**, so Maps and other apps see it system-wide, not just a Wi‑Fi lookup that outdoor GPS would overwrite.
 
 ## Features
 
-- One-tap teleport (map pin or place search)
-- Live joystick — walk / run / cycle / drive with light speed variation
-- Walk/Drive routing on real roads & footpaths (MapKit)
-- Draw a path or import / export GPX
-- Background keep-alive + live status bar + drop alerts
-- Favorites & recents
-- First-run setup walkthrough
-- Fully on-device — no analytics, nothing uploaded
+- Move to any place: tap the map, search, or paste coordinates
+- Joystick for walking, running, cycling or driving, with natural speed variation
+- Routes on real roads and footpaths (MapKit), drawn paths, and GPX import and export
+- Favourites, recents and saved routes
+- Background keep-alive, with an alert if a live session drops
+- Fully on-device: no analytics, nothing uploaded
 
 ## Install
 
-See [SETUP.md](SETUP.md) for full steps. Grab a prebuilt IPA from [Releases](https://github.com/ChrisMack32/Locus/releases), or build from source below.
+See [SETUP.md](SETUP.md) for the full steps. The latest IPA is published on [Releases](https://github.com/xerooae/trace/releases/latest).
 
-Bundle ID: `com.chrismack.locus`
+Bundle ID: `com.xerooae.trace` · URL scheme: `trace://`
 
 ### LiveContainer
 
-File pickers often don’t work inside LiveContainer. Use one of these:
+File pickers often don't work inside LiveContainer. Use one of these:
 
-1. Long-press **Locus** → **Settings** → enable **Fix File Picker**, then try Import again.
-2. Share the pairing file **into LiveContainer → Locus**.
-3. Copy the RPPairing plist contents → in Locus use **Paste RPPairing from clipboard** (setup or Settings).
+1. Long-press **Trace** → **Settings** → enable **Fix File Picker**, then try Import again.
+2. Share the pairing file **into LiveContainer → Trace**.
+3. Copy the RPPairing file's contents, then in Trace use **Paste from clipboard** (first run or Settings › Pairing).
 
 ## How it works
 
-Locus uses the MIT-licensed [idevice](https://github.com/jkcoxson/idevice) FFI to talk to Apple’s DVT location simulation over an on-device developer tunnel (the same class of mechanism Xcode uses).
+Trace uses the MIT-licensed [idevice](https://github.com/jkcoxson/idevice) FFI to talk to Apple's DVT location simulation over an on-device developer tunnel, the same mechanism Xcode uses.
 
-**iOS 27:** Settings → **Pair on this iPhone** advertises `_remotepairing-pairable-host._tcp`. Confirm the 6-digit code under Settings › Privacy & Security › Developer Mode › Pair with Host — no computer.
+- **iOS 27:** Settings › Pairing › **Pair on this iPhone** advertises a pairable host. Confirm the six-digit code under Settings › Privacy & Security › Developer Mode › Pair with Host. No computer needed.
+- **iOS 26:** import an **RPPairing** file once, made with [idevice_pair](https://github.com/jkcoxson/idevice_pair/releases).
 
-**iOS 18–26:** import an **RPPairing** file once from [idevice_pair](https://github.com/jkcoxson/idevice_pair/releases).
+Also install **[LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044)** (a loopback tunnel, default `10.7.0.1`).
 
-Also install **[LocalDevVPN](https://apps.apple.com/us/app/localdevvpn/id6755608044)** (loopback tunnel, default `10.7.0.1`), then sideload Locus.
+Start your first move on Wi‑Fi. After that it keeps working on cellular.
 
-Start a teleport on Wi‑Fi first; the session can keep working on cellular afterward.
-
-### Pokémon GO & similar games
-
-Locus spoofs location the same way Xcode’s developer tools do: it tells iOS “you’re here,” and other apps read that from the system. Apps that just trust GPS (Apple Maps, etc.) will follow it.
-
-**Pokémon GO is different.** It runs its own location checks and often rejects developer / simulated GPS (e.g. “Failed to detect location”). That’s expected with this method, not a Locus bug, and there’s no supported fix for it in this app.
-
-Tools like **iPogo** (and similar modified clients such as SpooferPro) work differently: they’re a **modified Pokémon GO app**, not a system-wide location spoof. Features live *inside* that altered game client, instead of feeding coordinates through iOS for every app. Locus never patches or replaces Pokémon GO; it only changes what the system reports. So those tools can appear to “work in Pokémon GO” while Locus correctly drives Maps but still gets blocked by Pokémon GO’s checks.
-
-Locus is for system-level teleporting. It isn’t a Pokémon GO client or an anti-cheat bypass.
+Some games run their own location checks and reject developer-set positions. That's expected with this method: Trace changes what the system reports and doesn't modify other apps.
 
 ## Build
 
-Building from source needs an Apple Developer account (free or paid) for code signing. The published IPA does **not** — just sideload it.
+The IPA is built in CI on every push to `main` (`.github/workflows/build.yml`), unsigned for LiveContainer to sign.
 
-1. Install [XcodeGen](https://github.com/yonaskolb/XcodeGen) if needed: `brew install xcodegen`
-2. Set your **Team ID** in `project.yml` (`DEVELOPMENT_TEAM`), *or* pick your team under Xcode → Signing & Capabilities after generating the project.
+To build locally you need a Mac with Xcode 26 or later and an Apple Developer account (free or paid):
+
+1. Install [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
+2. Set your Team ID in `project.yml` (`DEVELOPMENT_TEAM`), or pick your team in Xcode under Signing & Capabilities.
 3. Generate and open:
 
 ```bash
 xcodegen generate
-open Locus.xcodeproj
+open Trace.xcodeproj
 ```
 
-Or build from the CLI (replace with your Team ID from [developer.apple.com/account](https://developer.apple.com/account) → Membership):
+Or build from the command line:
 
 ```bash
 xcodegen generate
-xcodebuild -project Locus.xcodeproj -scheme Locus -configuration Release \
+xcodebuild -project Trace.xcodeproj -scheme Trace -configuration Release \
   -destination 'generic/platform=iOS' DEVELOPMENT_TEAM=YOUR_TEAM_ID build
 ```
 
-## License
+## Licence
 
-MIT. `Vendor/idevice` contains the idevice FFI (MIT). Locus is an independent open-source project and is not affiliated with Mirage / Wapixel.
+MIT. Trace is based on [Locus](https://github.com/ChrisMack32/Locus) (MIT), and `Vendor/idevice` contains the idevice FFI (MIT). See [LICENSE](LICENSE).

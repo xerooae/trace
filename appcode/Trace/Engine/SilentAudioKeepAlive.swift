@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 
-/// Plays near-silent audio so iOS keeps Locus runnable (and able to accept
+/// Plays near-silent audio so iOS keeps Trace runnable (and able to accept
 /// TCP) while the user is in Settings › Developer Mode.
 final class SilentAudioKeepAlive {
     private var player: AVAudioPlayer?
@@ -23,9 +23,9 @@ final class SilentAudioKeepAlive {
             p.play()
             player = p
             wasActive = true
-            NSLog("[Locus] silent audio keep-alive started")
+            NSLog("[Trace] silent audio keep-alive started")
         } catch {
-            NSLog("[Locus] silent audio keep-alive failed: %@", error.localizedDescription)
+            NSLog("[Trace] silent audio keep-alive failed: %@", error.localizedDescription)
         }
     }
 
@@ -37,7 +37,7 @@ final class SilentAudioKeepAlive {
     }
 
     private static func writeSilentWAV() throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("locus-silence.wav")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("trace-silence.wav")
         if FileManager.default.fileExists(atPath: url.path) { return url }
 
         let sampleRate: Int = 8000

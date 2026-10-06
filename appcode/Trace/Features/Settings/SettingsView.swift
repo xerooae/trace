@@ -73,12 +73,6 @@ struct SettingsView: View {
                 }
 
                 Section("Map") {
-                    Picker(selection: $session.mapStyleIndex) {
-                        Text("Muted").tag(0)
-                        Text("Satellite").tag(1)
-                    } label: {
-                        RowLabel("Map style", systemImage: "square.3.layers.3d")
-                    }
                     Toggle(isOn: $showRealPosition) {
                         RowLabel("Show real position", systemImage: "location")
                     }
@@ -119,6 +113,11 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            // Less space above the content: the large title sits in the bar, and the
+            // list starts right under it with compact section gaps.
+            .toolbarTitleDisplayMode(.inlineLarge)
+            .contentMargins(.top, 8, for: .scrollContent)
+            .listSectionSpacing(.compact)
             .onAppear(perform: refresh)
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { refresh() }
