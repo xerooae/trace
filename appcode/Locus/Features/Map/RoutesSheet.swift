@@ -39,16 +39,16 @@ struct RoutesSheet: View {
 
                 Section {
                     Button(action: onBuild) {
-                        Label("Route to \(targetName)", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                        RowLabel("Route to \(targetName)", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                     }
                     .disabled(target == nil || route.building)
                     Button(action: onDraw) {
-                        Label("Draw a path on the map", systemImage: "scribble")
+                        RowLabel("Draw a path on the map", systemImage: "scribble")
                     }
                     Button {
                         showImporter = true
                     } label: {
-                        Label("Import GPX", systemImage: "square.and.arrow.down")
+                        RowLabel("Import GPX", systemImage: "square.and.arrow.down")
                     }
                 }
 
@@ -56,14 +56,14 @@ struct RoutesSheet: View {
                     Section {
                         if let exportURL {
                             ShareLink(item: exportURL) {
-                                Label("Export GPX", systemImage: "square.and.arrow.up")
+                                RowLabel("Export GPX", systemImage: "square.and.arrow.up")
                             }
                         }
                         Button {
                             routeName = route.name ?? ""
                             naming = true
                         } label: {
-                            Label("Save to Places", systemImage: "star")
+                            RowLabel("Save to Places", systemImage: "star")
                         }
                     }
                 }

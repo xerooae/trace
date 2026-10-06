@@ -1,6 +1,7 @@
 import MapKit
 import NetworkExtension
 import SwiftUI
+import UIKit
 
 /// A route being built, drawn or imported on the Map tab.
 struct RouteDraft {
@@ -49,13 +50,6 @@ struct MapHomeView: View {
             }
         }
         .ignoresSafeArea()
-        .overlay(alignment: .top) {
-            statusPill
-                .frame(maxWidth: isRegular ? 420 : .infinity)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, TraceTheme.gutter)
-                .padding(.top, 4)
-        }
         .overlay(alignment: .bottom) {
             bottomStack
         }
@@ -168,41 +162,16 @@ struct MapHomeView: View {
         }
     }
 
-    // MARK: - Status pill (reading only)
-
-    private var statusPill: some View {
-        switch session.status {
-        case .idle:
-            return StatusPill(
-                state: session.candidate == nil ? .off : .candidate,
-                title: "Off",
-                subtitle: session.candidate == nil ? "Tap the map or search" : "Position placed, not sent",
-                coordinate: nil
-            )
-        case .connecting:
-            return StatusPill(state: .connecting, title: "Connecting…", subtitle: "Opening the tunnel", coordinate: nil)
-        case .active:
-            return StatusPill(state: .live, title: "Live", subtitle: liveSubtitle, coordinate: session.simulated)
-        case .reconnecting:
-            return StatusPill(state: .connecting, title: "Reconnecting…", subtitle: liveSubtitle, coordinate: session.simulated)
-        case .dropped:
-            return StatusPill(state: .interrupted, title: "Interrupted", subtitle: "Reconnecting…", coordinate: session.simulated)
-        }
-    }
-
-    private var liveSubtitle: String {
-        if session.joystickActive { return "Joystick · \(session.travelMode.title)" }
-        if session.followingRoute { return "Following a route · \(session.travelMode.title)" }
-        return session.liveName ?? "Position set"
-    }
-
-    // MARK: - Bottom stack (thumb zone)
+    // MARK: - Bottom stack (thumb zone): tools float above, the tray is one line
 
     private var bottomStack: some View {
         VStack(spacing: TraceTheme.rowGap) {
             floatingRow
-            tray
-                .frame(maxWidth: isRegular ? 400 : .infinity)
+            if session.joystickActive || session.followingRoute {
+                travelModePicker
+            }
+            lineCapsule
+                .frame(maxWidth: isRegular ? 420 : .infinity)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, TraceTheme.gutter)
@@ -210,188 +179,268 @@ struct MapHomeView: View {
         .animation(TraceTheme.motion, value: trayKey)
     }
 
-    /// Changes whenever the tray's rows change, so rows grow upward smoothly.
+    /// Changes whenever the bottom stack changes shape, so it animates smoothly.
     private var trayKey: String {
         "\(session.joystickActive)|\(session.followingRoute)|\(session.candidate != nil)|\(session.status.label)|\(route.drawing)|\(tunnelConnected)"
     }
 
+    /// Routes and Joystick float on the left; map controls, or the joystick pad, on the right.
     private var floatingRow: some View {
         HStack(alignment: .bottom, spacing: TraceTheme.rowGap) {
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    glassButton("point.topleft.down.to.point.bottomright.curvepath", label: "Routes") {
+                        showRoutes = true
+                    }
+                    glassButton("dot.circle.and.hand.point.up.left.fill", label: "Joystick",
+                                selected: session.joystickActive, action: toggleJoystick)
+                }
+            }
+            Spacer(minLength: 0)
             if session.joystickActive {
-                mapButtons
-                Spacer(minLength: 0)
                 JoystickPad { session.updateJoystick(vector: $0) }
                     .transition(.scale(scale: 0.9).combined(with: .opacity))
             } else {
-                Spacer(minLength: 0)
-                mapButtons
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        glassButton("square.3.layers.3d",
+                                    label: session.mapStyleIndex == 1 ? "Map style: satellite" : "Map style: muted",
+                                    action: cycleMapStyle)
+                        glassButton("location", label: "Show my position", action: showMyPosition)
+                    }
+                }
             }
         }
     }
 
-    private var mapButtons: some View {
-        GlassEffectContainer(spacing: 8) {
-            HStack(spacing: 8) {
-                Button(action: cycleMapStyle) {
-                    Image(systemName: "square.3.layers.3d")
-                        .frame(width: 24, height: 24)
-                }
-                .accessibilityLabel(session.mapStyleIndex == 1 ? "Map style: satellite" : "Map style: muted")
-                Button(action: showMyPosition) {
-                    Image(systemName: "location")
-                        .frame(width: 24, height: 24)
-                }
-                .accessibilityLabel("Show my position")
+    /// A floating glass circle. Selected (Joystick on) is Trace Blue glass.
+    @ViewBuilder private func glassButton(_ systemImage: String, label: String, selected: Bool = false,
+                                          action: @escaping () -> Void) -> some View {
+        if selected {
+            Button(action: action) {
+                Image(systemName: systemImage)
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .controlSize(.large)
+            .tint(TraceTheme.accent)
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(.isSelected)
+        } else {
+            Button(action: action) {
+                Image(systemName: systemImage)
+                    .frame(width: 24, height: 24)
             }
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
             .controlSize(.large)
             .tint(.white)
+            .accessibilityLabel(label)
         }
     }
 
-    private var tray: some View {
-        VStack(spacing: TraceTheme.rowGap) {
-            if route.drawing {
-                drawingRow
-            } else {
-                contextRow
+    private var travelModePicker: some View {
+        Picker("Travel mode", selection: $session.travelMode) {
+            ForEach(TravelMode.allCases) { mode in
+                Text(mode.title).tag(mode)
             }
-            if session.joystickActive || session.followingRoute {
-                Picker("Travel mode", selection: $session.travelMode) {
-                    ForEach(TravelMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
+        }
+        .pickerStyle(.segmented)
+        .padding(6)
+        .traceGlass(.regular, in: Capsule())
+        .frame(maxWidth: isRegular ? 420 : .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sensoryFeedback(.selection, trigger: session.travelMode)
+    }
+
+    // MARK: - The one line
+
+    /// What the line says: the marker's state, a title, then a word with the
+    /// coordinates (or a short detail when there are none).
+    private struct Line {
+        var state: PositionState
+        var title: String
+        var word: String? = nil
+        var coordinate: CLLocationCoordinate2D? = nil
+        var detail: String? = nil
+    }
+
+    private var currentLine: Line {
+        if route.drawing {
+            return Line(state: .off, title: "Drawing a path",
+                        detail: route.drawn.count < 2 ? "Tap the map to add points" : "\(route.drawn.count) points")
+        }
+        if session.status.isDropped {
+            return Line(state: .interrupted, title: "Interrupted", detail: "Reconnecting…")
+        }
+        if session.status == .connecting || session.status == .reconnecting {
+            return Line(state: .connecting, title: session.status.label, detail: session.liveName ?? "Opening the tunnel")
+        }
+        if let candidate = session.candidate {
+            return Line(state: .candidate, title: session.pinName ?? "Selected position", word: "Not sent", coordinate: candidate)
+        }
+        if session.isSpoofing, let live = session.simulated {
+            return Line(state: .live, title: session.liveName ?? "Position set", word: liveWord, coordinate: live)
+        }
+        if !tunnelConnected {
+            return Line(state: .off, title: "LocalDevVPN isn't connected", detail: "Connect it before you move")
+        }
+        return Line(state: .off, title: "Off", detail: "Tap the map or search")
+    }
+
+    /// "Live", "Live · Joystick", "Live · Route".
+    private var liveWord: String {
+        if session.joystickActive { return "Live · Joystick" }
+        if session.followingRoute { return "Live · Route" }
+        return "Live"
+    }
+
+    /// The tray is one glass capsule: the marker, what's happening and where, then the
+    /// action at the thumb. Long-press it for Save, Copy coordinates and Clear.
+    private var lineCapsule: some View {
+        let line = currentLine
+        return HStack(spacing: 12) {
+            PositionMarker(state: line.state, width: 14)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(line.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(TraceTheme.ink)
+                    .lineLimit(1)
+                HStack(spacing: 0) {
+                    if let word = line.word {
+                        Text(line.coordinate == nil ? word : "\(word) · ")
+                            .font(.caption.weight(.semibold))
+                    }
+                    if let coordinate = line.coordinate {
+                        Text(Coord.format(coordinate))
+                            .font(.caption.monospaced())
+                    } else if let detail = line.detail {
+                        Text(detail)
+                            .font(.caption)
                     }
                 }
-                .pickerStyle(.segmented)
-                .sensoryFeedback(.selection, trigger: session.travelMode)
+                .foregroundStyle(TraceTheme.ink2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
             }
-            actionRow
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.updatesFrequently)
+            Spacer(minLength: 4)
+            lineActions
         }
-        .padding(TraceTheme.trayPadding)
-        .traceGlass(.regular, in: RoundedRectangle(cornerRadius: TraceTheme.trayRadius, style: .continuous))
+        .padding(.leading, 18)
+        .padding(.trailing, 8)
+        .frame(minHeight: 64)
+        .traceGlass(.regular, in: Capsule())
+        .contextMenu { lineMenu }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Controls")
     }
 
-    @ViewBuilder private var contextRow: some View {
-        if session.status.isDropped {
-            note("Interrupted", "The tunnel dropped. Trace is reconnecting and will go live again on its own.")
-        } else if let candidate = session.candidate {
-            placeRow(session.pinName ?? "Selected position", candidate, favoriteName: session.pinName, clearable: true)
-        } else if session.isSpoofing, let live = session.simulated {
-            placeRow(session.liveName ?? "Position set", live, favoriteName: session.liveName, clearable: false)
-        } else if !tunnelConnected {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("LocalDevVPN isn't connected")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(TraceTheme.ink)
-                    Text("Connect it before you move.")
-                        .font(.footnote)
-                        .foregroundStyle(TraceTheme.ink2)
-                }
-                .padding(.leading, 6)
-                Spacer(minLength: 8)
-                SecondaryButton("Connect", size: .regular, expand: false) {
-                    LocalDevVPN.openOrInstall()
-                }
-            }
-        }
-    }
-
-    private func placeRow(_ title: String, _ coordinate: CLLocationCoordinate2D, favoriteName: String?, clearable: Bool) -> some View {
-        let saved = session.isFavorite(coordinate)
-        return HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(TraceTheme.ink)
-                    .lineLimit(1)
-                Text(Coord.format(coordinate))
-                    .font(.caption.monospaced())
-                    .foregroundStyle(TraceTheme.ink2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .padding(.leading, 6)
-            .accessibilityElement(children: .combine)
-            Spacer(minLength: 8)
-            CircleButton(systemImage: saved ? "star.fill" : "star",
-                         label: saved ? "Remove from Favourites" : "Save to Favourites") {
-                session.toggleFavorite(coordinate, name: favoriteName)
-            }
-            .sensoryFeedback(.selection, trigger: saved)
-            if clearable {
-                CircleButton(systemImage: "xmark", label: "Clear place") {
-                    session.clearCandidate()
-                }
-            }
-        }
-    }
-
-    private func note(_ title: String, _ body: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(TraceTheme.ink)
-            Text(body)
-                .font(.footnote)
-                .foregroundStyle(TraceTheme.ink2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 6)
-    }
-
-    private var drawingRow: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Drawing a path")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(TraceTheme.ink)
-                Text(route.drawn.count < 2 ? "Tap the map to add points." : "\(route.drawn.count) points")
-                    .font(.footnote)
-                    .foregroundStyle(TraceTheme.ink2)
-            }
-            .padding(.leading, 6)
-            Spacer(minLength: 8)
-            CircleButton(systemImage: "arrow.uturn.backward", label: "Undo last point") {
+    /// One action at the thumb: blue Move, or a neutral Stop, Cancel, Connect or Done.
+    @ViewBuilder private var lineActions: some View {
+        if route.drawing {
+            Button {
                 _ = route.drawn.popLast()
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.body.weight(.medium))
+                    .frame(width: 40, height: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(TraceTheme.ink)
             .disabled(route.drawn.isEmpty)
-            SecondaryButton("Done", size: .regular, expand: false, action: finishDrawing)
-        }
-    }
-
-    private var actionRow: some View {
-        HStack(spacing: TraceTheme.rowGap) {
-            CircleButton(systemImage: "point.topleft.down.to.point.bottomright.curvepath", label: "Routes") {
-                showRoutes = true
-            }
-            CircleButton(systemImage: "dot.circle.and.hand.point.up.left.fill",
-                         label: "Joystick",
-                         selected: session.joystickActive,
-                         action: toggleJoystick)
-            primaryAction
-        }
-    }
-
-    /// One white action, closest to the thumb. Stop and Cancel are bordered, not red.
-    @ViewBuilder private var primaryAction: some View {
-        if let candidate = session.candidate {
-            if session.isSpoofing {
-                SecondaryButton("Stop", expand: false) { session.stop(pairing: pairing) }
-            }
-            PrimaryButton("Move here") { session.teleport(to: candidate, pairing: pairing) }
-                .disabled(session.isBusy)
+            .accessibilityLabel("Undo last point")
+            lineButton("Done", primary: false, action: finishDrawing)
+        } else if session.status.isDropped || session.status == .reconnecting {
+            lineButton("Stop", primary: false) { session.stop(pairing: pairing) }
         } else if session.status == .connecting {
-            SecondaryButton("Cancel") { session.stop(pairing: pairing) }
-        } else if session.isSpoofing || session.status.isDropped {
-            SecondaryButton("Stop") { session.stop(pairing: pairing) }
+            lineButton("Cancel", primary: false) { session.stop(pairing: pairing) }
+        } else if let candidate = session.candidate {
+            if session.isSpoofing {
+                lineButton("Stop", primary: false) { session.stop(pairing: pairing) }
+            } else {
+                starButton(candidate, name: session.pinName)
+            }
+            lineButton("Move", primary: true) { session.teleport(to: candidate, pairing: pairing) }
+                .disabled(session.isBusy)
+        } else if session.isSpoofing, let live = session.simulated {
+            starButton(live, name: session.liveName)
+            lineButton("Stop", primary: false) { session.stop(pairing: pairing) }
+        } else if !tunnelConnected {
+            lineButton("Connect", primary: false) { LocalDevVPN.openOrInstall() }
         } else {
-            PrimaryButton("Move here") {}
+            lineButton("Move", primary: true) {}
                 .disabled(true)
+        }
+    }
+
+    private func starButton(_ coordinate: CLLocationCoordinate2D, name: String?) -> some View {
+        let saved = session.isFavorite(coordinate)
+        return Button {
+            session.toggleFavorite(coordinate, name: name)
+        } label: {
+            Image(systemName: saved ? "star.fill" : "star")
+                .font(.body.weight(.medium))
+                .frame(width: 40, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(TraceTheme.ink)
+        .accessibilityLabel(saved ? "Remove from Favourites" : "Save to Favourites")
+        .sensoryFeedback(.selection, trigger: saved)
+    }
+
+    /// A compact capsule inside the line: Trace Blue for Move, neutral for the rest.
+    @ViewBuilder private func lineButton(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        if primary {
+            Button(action: action) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, 6)
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .tint(TraceTheme.accent)
+        } else {
+            Button(action: action) {
+                Text(title)
+                    .font(.headline)
+                    .padding(.horizontal, 4)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+            .tint(.white)
+        }
+    }
+
+    /// Long-press menu on the line.
+    @ViewBuilder private var lineMenu: some View {
+        if let coordinate = session.candidate ?? session.simulated {
+            let name = session.candidate != nil ? session.pinName : session.liveName
+            Button {
+                session.toggleFavorite(coordinate, name: name)
+            } label: {
+                Label(session.isFavorite(coordinate) ? "Remove from Favourites" : "Save to Favourites", systemImage: "star")
+            }
+            Button {
+                UIPasteboard.general.string = Coord.format(coordinate, decimals: 5)
+            } label: {
+                Label("Copy coordinates", systemImage: "doc.on.doc")
+            }
+            if session.candidate != nil {
+                Button(role: .destructive) {
+                    session.clearCandidate()
+                } label: {
+                    Label("Clear place", systemImage: "xmark")
+                }
+            }
         }
     }
 
@@ -493,45 +542,5 @@ struct MapHomeView: View {
         } catch {
             session.lastError = error.localizedDescription
         }
-    }
-}
-
-/// The marker in its state, the word, then coordinates in SF Mono. Reading only.
-struct StatusPill: View {
-    let state: PositionState
-    let title: String
-    let subtitle: String?
-    let coordinate: CLLocationCoordinate2D?
-
-    var body: some View {
-        HStack(spacing: 12) {
-            PositionMarker(state: state, width: 11)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(TraceTheme.ink)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(TraceTheme.ink2)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 8)
-            if let coordinate {
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(Coord.parts(coordinate).0)
-                    Text(Coord.parts(coordinate).1)
-                }
-                .font(.caption.monospaced())
-                .foregroundStyle(TraceTheme.ink2)
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 8)
-        .frame(minHeight: 54)
-        .traceGlass(.regular, in: Capsule())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.updatesFrequently)
     }
 }

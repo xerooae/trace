@@ -6,8 +6,8 @@ import UIKit
 /// separators match the Settings app. Trace Blue marks actions; the Bearing and
 /// the live light stay white; red is for errors only.
 enum TraceTheme {
-    /// Trace Blue, #3D7EFF. White labels on it 3.7:1 (bold), on black 5.6:1, on cells 4.6:1.
-    static let accent = Color(red: 61 / 255, green: 126 / 255, blue: 1)
+    /// Trace Blue, #0070FF: fully saturated. White labels on it 4.4:1, on black 4.8:1.
+    static let accent = Color(red: 0, green: 112 / 255, blue: 1)
     /// The light: the Bearing's light half and the live marker. Never blue.
     static let light = Color.white
     static let ink = Color.primary
@@ -21,8 +21,8 @@ enum TraceTheme {
     static let background = Color(uiColor: .systemGroupedBackground)
     static let cell = Color(uiColor: .secondarySystemGroupedBackground)
     static let signal = Color(uiColor: .systemRed)
-    /// Native toggles switch to system grey, not green: the brand has no hue.
-    static let toggleOn = Color(uiColor: .systemGray)
+    /// Native toggles switch to Trace Blue.
+    static let toggleOn = accent
 
     static let gutter: CGFloat = 16
     static let trayRadius: CGFloat = 28
@@ -66,7 +66,7 @@ extension View {
         modifier(TraceGlassModifier(style: style, interactive: interactive, shape: shape))
     }
 
-    /// Native toggle, system grey when on.
+    /// Native toggle, Trace Blue when on.
     func traceToggle() -> some View {
         tint(TraceTheme.toggleOn)
     }
@@ -137,42 +137,30 @@ extension SecondaryButton where Label == Text {
     }
 }
 
-/// Round icon buttons in the tray: neutral, or filled with Trace Blue when selected.
-struct CircleButton: View {
+// MARK: - Shared pieces
+
+/// List row label: white icon and white text, as in the Settings app.
+/// Blue is for toggles and actions, never for row icons.
+struct RowLabel: View {
+    let title: String
     let systemImage: String
-    let label: String
-    var selected = false
-    var size: ControlSize = .large
-    let action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
+
+    init(_ title: String, systemImage: String) {
+        self.title = title
+        self.systemImage = systemImage
+    }
 
     var body: some View {
-        if selected {
-            Button(action: action) {
-                Image(systemName: systemImage)
-                    .foregroundStyle(Color.white)
-                    .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.circle)
-            .controlSize(size)
-            .tint(TraceTheme.accent)
-            .accessibilityLabel(label)
-            .accessibilityAddTraits(.isSelected)
-        } else {
-            Button(action: action) {
-                Image(systemName: systemImage)
-                    .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.circle)
-            .controlSize(size)
-            .tint(.white)
-            .accessibilityLabel(label)
+        Label {
+            Text(title)
+                .foregroundStyle(isEnabled ? TraceTheme.ink : TraceTheme.ink3)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(isEnabled ? TraceTheme.ink : TraceTheme.ink3)
         }
     }
 }
-
-// MARK: - Shared pieces
 
 /// Numbered steps in a grouped cell, for pairing instructions.
 struct StepsCard: View {

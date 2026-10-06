@@ -271,21 +271,21 @@ struct PlaceSheet: View {
                         router.tab = .map
                         dismiss()
                     } label: {
-                        Label("Route here", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                        RowLabel("Route here", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
                     }
                     if isFavourite {
                         Button(action: onRename) {
-                            Label("Rename", systemImage: "pencil")
+                            RowLabel("Rename", systemImage: "pencil")
                         }
                     } else {
                         Button {
                             session.addFavorite(name: place.name, coordinate: place.coordinate)
                         } label: {
-                            Label("Add to Favourites", systemImage: "star")
+                            RowLabel("Add to Favourites", systemImage: "star")
                         }
                     }
                     ShareLink(item: "\(place.name) · \(Coord.format(place.coordinate, decimals: 5))") {
-                        Label("Share", systemImage: "square.and.arrow.up")
+                        RowLabel("Share", systemImage: "square.and.arrow.up")
                     }
                 }
 

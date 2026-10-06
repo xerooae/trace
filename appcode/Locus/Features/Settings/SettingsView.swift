@@ -44,7 +44,7 @@ struct SettingsView: View {
                         LabeledContent {
                             Text(pairing.hasPairingFile ? "Paired" : "Not paired")
                         } label: {
-                            Label("Pairing", systemImage: "iphone")
+                            RowLabel("Pairing", systemImage: "iphone")
                         }
                     }
                     NavigationLink {
@@ -53,7 +53,7 @@ struct SettingsView: View {
                         LabeledContent {
                             Text(tunnelConnected ? "Connected" : "Not connected")
                         } label: {
-                            Label("Tunnel", systemImage: "lock.shield")
+                            RowLabel("Tunnel", systemImage: "lock.shield")
                         }
                     }
                 }
@@ -64,10 +64,10 @@ struct SettingsView: View {
                             Text(mode.title).tag(mode)
                         }
                     } label: {
-                        Label("Travel mode", systemImage: "figure.walk")
+                        RowLabel("Travel mode", systemImage: "figure.walk")
                     }
                     Toggle(isOn: $speedVariation) {
-                        Label("Natural speed variation", systemImage: "waveform.path")
+                        RowLabel("Natural speed variation", systemImage: "waveform.path")
                     }
                     .traceToggle()
                 }
@@ -77,17 +77,17 @@ struct SettingsView: View {
                         Text("Muted").tag(0)
                         Text("Satellite").tag(1)
                     } label: {
-                        Label("Map style", systemImage: "square.3.layers.3d")
+                        RowLabel("Map style", systemImage: "square.3.layers.3d")
                     }
                     Toggle(isOn: $showRealPosition) {
-                        Label("Show real position", systemImage: "location")
+                        RowLabel("Show real position", systemImage: "location")
                     }
                     .traceToggle()
                 }
 
                 Section {
                     Toggle(isOn: $interruptionAlerts) {
-                        Label("Interruption alerts", systemImage: "bell")
+                        RowLabel("Interruption alerts", systemImage: "bell")
                     }
                     .traceToggle()
                 } header: {
@@ -100,17 +100,17 @@ struct SettingsView: View {
                     LabeledContent {
                         Text(AppInfo.version)
                     } label: {
-                        Label("Version", systemImage: "info.circle")
+                        RowLabel("Version", systemImage: "info.circle")
                     }
                     NavigationLink {
                         LicencesView()
                     } label: {
-                        Label("Licences", systemImage: "doc.text")
+                        RowLabel("Licences", systemImage: "doc.text")
                     }
                     NavigationLink {
                         PrivacyView()
                     } label: {
-                        Label("Privacy", systemImage: "hand.raised")
+                        RowLabel("Privacy", systemImage: "hand.raised")
                     }
                 } header: {
                     Text("About")
@@ -250,13 +250,13 @@ struct PairingSettingsView: View {
                         PairOnDeviceView(mode: .pushed)
                             .navigationBarTitleDisplayMode(.inline)
                     } label: {
-                        Label("Pair on this iPhone", systemImage: "iphone.radiowaves.left.and.right")
+                        RowLabel("Pair on this iPhone", systemImage: "iphone.radiowaves.left.and.right")
                     }
                 }
                 Button {
                     showImporter = true
                 } label: {
-                    Label("Import a pairing file", systemImage: "square.and.arrow.down")
+                    RowLabel("Import a pairing file", systemImage: "square.and.arrow.down")
                 }
                 Button {
                     do {
@@ -266,7 +266,7 @@ struct PairingSettingsView: View {
                         message = error.localizedDescription
                     }
                 } label: {
-                    Label("Paste from clipboard", systemImage: "doc.on.clipboard")
+                    RowLabel("Paste from clipboard", systemImage: "doc.on.clipboard")
                 }
             } footer: {
                 Text(supportsOnDevicePairing
@@ -332,7 +332,7 @@ struct TunnelSettingsView: View {
                 Button {
                     LocalDevVPN.openOrInstall()
                 } label: {
-                    Label(installed ? "Open LocalDevVPN" : "Get LocalDevVPN", systemImage: "lock.shield")
+                    RowLabel(installed ? "Open LocalDevVPN" : "Get LocalDevVPN", systemImage: "lock.shield")
                 }
             } footer: {
                 Text("LocalDevVPN opens a private tunnel on this iPhone. Start your first move on Wi‑Fi; after that it keeps working on cellular.")
